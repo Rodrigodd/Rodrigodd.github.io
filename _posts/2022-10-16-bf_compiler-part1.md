@@ -1,7 +1,7 @@
 ---
 layout: post
 title:  "Interpreting, Optimizing, JITing and Compiling Brainfuck code"
-date:   2022-09-25 12:37:00 -0300
+date:   2022-10-16 12:00:00 -0300
 ---
 
 This is a blog post series where I will reproduce [Eli Bendersky’s Adventures

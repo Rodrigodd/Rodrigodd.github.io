@@ -1,7 +1,7 @@
 ---
 layout: page
 title:  "About"
-date:   2022-10-16 12:37:00 -0300
+date:   2022-10-16 13:00:00 -0300
 ---
 
 Hello! I am Rodrigo Batista de Moraes, a programmer currently interested in
