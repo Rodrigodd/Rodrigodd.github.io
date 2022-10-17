@@ -10,7 +10,7 @@ language][rust]. I will also expand this series into compile the source code
 into actual executable binaries.
 
 The goal of this series is to give a small intro into writing compilers, and
-explore the tools in the Rust ecosystem that can be used for it.
+explore the tools in the Rust ecosystem that can be used for that.
 
 Like in the original series, this will be achieved by writing a compiler for
 the brainfuck programming language, in increasing degrees of complexity.
@@ -940,14 +940,29 @@ the mandelbrot.bf. Instructions count goes down by 36.1% on mandelbrot and
 
 What we basically have done through this post, is basically transform the
 program source code into instructions that can be interpreted in a more
-efficient way. We also look for common patterns in the code and created
+efficient way. We also looked for common patterns in the code and created
 specific instructions for them, increasing the performance even more.
 
 These are already a basic version of what interpreters and compilers do.
 Instead of interpreting/compiling the code directly from its source code (like
 how AST-walking interpreters, or single pass compilers do), they most of the
 time convert them to an intermediate representation (IR) that is more suitable
-for interpreting, compiling or applying optimizations.
+for interpreting, compiling, applying optimizations, etc.
+
+For example, in Lua an AST is not even created, the source code is directly
+compile, in a single pass, to *bytecode*, which is the IR used by the Lua
+interpreter.
+
+A more complex example would be Rust. In Rust, the code AST is first converted
+to a High-Level Intermediate Representation (process called HIR lowering),
+which is used for type inference, trait solving and type checking. After that,
+it is lowered to Mid-Level Intermediate Representation (MIR), which is used for
+borrow checking, applying optimizations and monomorphization collecting. And
+finally, MIR is converted to LLVM-IR, which is passed to LLVM to apply more
+optimizations and compile down to machine code. [More details can be found
+here][rust_overview].
+
+[rust_overview]: https://rustc-dev-guide.rust-lang.org/overview.html
 
 # Future work
 
