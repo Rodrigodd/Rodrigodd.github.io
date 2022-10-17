@@ -6,8 +6,8 @@ date:   2022-10-16 12:00:00 -0300
 
 This is a blog post series where I will reproduce [Eli Bendersky’s Adventures
 In JIT Compilation series][eli], but this time using the [Rust programming
-language][rust]. I will also expand this series into compile the source code
-into actual executable binaries.
+language][rust]. I will also expand this series into compiling actual
+executable binaries.
 
 The goal of this series is to give a small intro into writing compilers, and
 explore the tools in the Rust ecosystem that can be used for that.
