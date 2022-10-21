@@ -352,7 +352,7 @@ factorization program][factor], by Brian Raiter, with the input 179424691.
 The current interpreter has run mandelbrot.bf in 91.6 seconds and factor.bf in 27.18 seconds[^bench][^elis_bench].
 
 [^bench]: You can find all measures in detail, including method and
-    environment, [in this document](benchmark.adoc).
+    environment, [in this document][benchmark.adoc].
 
 [^elis_bench]: The implementation in the original blog post have taken, respectively, 64
     seconds and 24 seconds on my machine. But my implementation is doing extra
