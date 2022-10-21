@@ -1,7 +1,7 @@
 ---
 layout: post
 title:  "Compiling Brainfuck code - Part 1: A Optimized Interpreter"
-date:   2022-10-16 12:00:00 -0300
+date:   2022-10-21 15:00:00 -0300
 ---
 
 This is the first post of a blog post series where I will reproduce [Eli
