@@ -1222,14 +1222,14 @@ Instruction::Move(n) => {
     if n > 0 {
         dynasm! { code
             ; lea eax, [r13 + n]
-            ; add r13, -(3000 - n as i64)
+            ; add r13, -(30000 - n)
             ; cmp eax, 30000
-            ; cmovl	r13d, eax
+            ; cmovl r13d, eax
         }
     } else {
         dynasm! { code
-            ; lea eax, [r13 - 5]
-            ; add r13d, 29995
+            ; lea eax, [r13 + n]
+            ; add r13d, 30000 + n
             ; test eax, eax
             ; cmovns r13d, eax
         }
@@ -1259,11 +1259,22 @@ current cell, clearing it, and adding to the target cell.
 Instruction::AddTo(n) => dynasm! { code
     ; .arch x64
     // rax = cell to add to
-    ; lea	ecx, [r13 + n]
-    ; lea	eax, [r13 - (30000 - n)]
-    ; cmp	ecx, 30000
-    ; cmovl	eax, ecx
-
+    ;;
+    if n > 0 {
+        dynasm! { code
+            ; lea ecx, [r13 + n]
+            ; lea eax, [r13 + n - 30000]
+            ; cmp ecx, 30000
+            ; cmovl eax, ecx
+        }
+    } else {
+        dynasm! { code
+            ; lea ecx, [r13 + n]
+            ; lea eax, [r13 + 30000 + n]
+            ; test ecx, ecx
+            ; cmovns eax, ecx
+        }
+    }
     ; mov cl, [r12 + r13]
     ; add BYTE [r12 + rax], cl
     ; mov BYTE [r12 + r13], 0
@@ -1285,7 +1296,7 @@ Instruction::MoveUntil(n) => dynasm! { code
     ; repeat:
 
     // check if 0
-    ; cmp BYTE [r12+r13], 0
+    ; cmp BYTE [r12 + r13], 0
     ; je >exit
 
     // Move n
@@ -1293,20 +1304,20 @@ Instruction::MoveUntil(n) => dynasm! { code
     if n > 0 {
         dynasm! { code
             ; lea eax, [r13 + n]
-            ; add r13d, -(3000 - n)
+            ; add r13, -(30000 - n)
             ; cmp eax, 30000
-            ; cmovl	r13d, eax
+            ; cmovl r13d, eax
         }
     } else {
         dynasm! { code
-            ; lea eax, [r13 - 5]
-            ; add r13d, 29995
+            ; lea eax, [r13 + n]
+            ; add r13d, 30000 + n
             ; test eax, eax
             ; cmovns r13d, eax
         }
     }
 
-    ; jp <repeat
+    ; jmp <repeat
 
     ; exit:
 },
