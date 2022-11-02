@@ -1252,8 +1252,8 @@ Instruction::Clear => dynasm! { code
 ```
 
 For the `AddTo(i32)`, we compute that index of the target cell similarly to the
-`Move(i32)` instruction, and finish by reading the current cell, clearing it,
-and adding to the target cell.
+`Move(i32)` instruction, but with the result in `rax`, and finish by reading the
+current cell, clearing it, and adding to the target cell.
 
 ```rust
 Instruction::AddTo(n) => dynasm! { code
@@ -1273,9 +1273,10 @@ Instruction::AddTo(n) => dynasm! { code
 And for the `MoveUntil(i32)` instructions we, create a loop where we check for
 zero, exit the loop if true, otherwise do a move and repeat.
 
-Here I used two unseen features of dynasm. Local labels, denoted by `>`, and
-`;;` that allow us to include Rust code inside the macro. Also notice that I
-copied the code from `Move(i32)` here.
+Here I used two unseen features of dynasm. Local labels, denoted by `:` and `<`
+or `>` depending on if the jump is backwards or forwards, and `;;` that allow us
+to include Rust code inside the macro. Also notice that I copied the code from
+`Move(i32)` here.
 
 ```rust
 Instruction::MoveUntil(n) => dynasm! { code
@@ -1326,7 +1327,7 @@ instructions could result in a better performance. For example, using `xor eax,
 eax` instead of `xor rax, rax` would result in a smaller instruction, and using
 `mov [r12 + r13], r14` where `r14` is register with the value 0 would be faster
 than `mov [r12 + r13], 0`. We could also check if two instructions are reading
-the same cell twice, and optimize that.
+the same cell twice, and optimize that. Etc.
 
 But these types of optimizations need a deep understanding of the instructions
 set and how each instruction is executed by the processor (knowledge that I
