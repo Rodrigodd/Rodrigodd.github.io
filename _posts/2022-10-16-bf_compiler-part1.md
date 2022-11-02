@@ -426,10 +426,10 @@ match self.instructions[self.program_counter] {
 self.program_counter += 1;
 ```
 
-Now, for computing the bracket pair we can keep use a stack: every time we
-encounter a `[` we push its address to the stack (filling `JumpRight` with a
-dummy address), and every time we encounter a `]` we pop from the stack, and
-fix both jump instructions' addresses:
+Now, for computing the bracket pair we can use a stack: every time we encounter
+a `[` we push its address to the stack (filling `JumpRight` with a dummy
+address), and every time we encounter a `]` we pop from the stack, and fix both
+jump instructions' addresses.
 
 So in `Program::new` we replace the `filter_map` by:
 
