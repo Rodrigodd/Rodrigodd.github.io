@@ -1,0 +1,4 @@
+{"rule":"IN_A_X_MANNER","sentence":"^\\QAnd on \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q, we pop the labels from the stack, and use them in a similar way, but with opposite labels:\\E$"}
+{"rule":"HAVE_PART_AGREEMENT","sentence":"^\\QWhen implementing the \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q instruction, I notice that x86 does not have add immediate for 64-bit values, so I downgrade all \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Qs used in instructions to \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q.\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QCranelift is a code generator written in Rust, and used by projects such as Wasmtime and rustc_codegen_cranelift.\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QThe previous part is here({% post_url 2022-10-16-bf_compiler-part1 %}), where we made an optimized brainfuck interpreter.\\E$"}
