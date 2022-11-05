@@ -26,7 +26,6 @@ To-do's:
  - Introduce the concept of Runtime, and mention it throughout the post.
  - Check how many times I said "finally".
  - Explicitly mention and define "single-pass".
- - Mention nasm instead of gnu assembler.
  - When leaking mmap, talk a little about function pointers safety.
 
 This is the second post of a blog post series where I will reproduce [Eli
@@ -199,21 +198,24 @@ mov rax, rdi  ; the return value is rax, so I move rdi to rax
 ret           ; return from the function
 ```
 
-Passing it through the GNU assembler, followed by objdump:
+Passing it through the [Netwide Assembler] (nasm), followed by [objdump]:
+
+[Netwide Assembler]: https://www.nasm.us/
+[objdump]: https://linux.die.net/man/1/objdump
 
 ```shell
-$ as -msyntax=intel -mnaked-reg add1.s -o add1.out
-$ objdump -d add1.out
+$ nasm add1.s -felf64
+$ objdump -M intel -d add1.o
 
-add1.out:     file format elf64-x86-64
+add1.o:     file format elf64-x86-64
 
 
 Disassembly of section .text:
 
 0000000000000000 <.text>:
-   0:   48 83 c7 01             add    $0x1,%rdi
-   4:   48 89 f8                mov    %rdi,%rax
-   7:   c3                      retq
+   0:	48 83 c7 01          	add    rdi,0x1
+   4:	48 89 f8             	mov    rax,rdi
+   7:	c3                   	ret    
 ```
 
 And we could write that in a rust program:
