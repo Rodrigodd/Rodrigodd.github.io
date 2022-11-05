@@ -1400,6 +1400,31 @@ And our [optimized JIT compiler is complete]! Measuring its performance:
 
 And was expected, the performance increase is big! More than 3x faster.
 
+# About tracing JIT
+
+Our JIT compiler implementation is very straight forward. But there is much more
+to JIT compilation than we have implemented here. One of them, is if compiling
+and optimizing the code is even worth it.
+
+For example, there are sections in the program that are only executed once, at
+startup. So first compiling it to machine and then executing it, may be slower
+than merely interpreting it directly. Compiling it, only start to be worth if
+the code is executed at least a couple of times.
+
+But again, you can also spend a lot of time trying to optimize the generated
+code, but it only pays off if the code is executed more than a couple of times.
+
+A technique that takes that in account is the [tracing just-in-time
+compilation]. This technique profile how many times each loop in the program is
+executed, and only starting applying some levels of optimization after passing
+certain thresholds.
+
+Not only that, the compiler can trace which paths in the code are being
+executed, and apply specific optimizations to them. It can even incorporate
+runtime information in the optimizations, like type information in dynamically
+typed languages.
+
+[tracing just-in-time compilation]: https://en.wikipedia.org/wiki/Tracing_just-in-time_compilation
 
 # Future work
 
@@ -1410,8 +1435,8 @@ Interpreter. But we can always do better. One possibility is to investigate what
 choice of instructions could result in a better performance. For example, using
 `xor eax, eax` instead of `xor rax, rax` would result in a smaller instruction,
 and using `mov [r12 + r13], r14` where `r14` is register with the value 0 would
-be faster than `mov [r12 + r13], 0`. We could also check if two instructions are
-reading the same cell twice, and optimize that. Etc.
+be faster than `mov [r12 + r13], 0`. We could also check if multiple
+instructions are reading from the same cell, and optimize that to one read. Etc.
 
 But these types of optimizations need a deep understanding of the target
 instructions set and how each instruction is executed by the processor
