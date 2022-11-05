@@ -19,9 +19,6 @@ date:   2022-10-22 12:00:00 -0300
     {{ ert }} minute{% if ert != 1 %}s{% endif %}
 </span>
 
-To-do's:
- - Explicitly mention and define "single-pass".
-
 This is the second post of a blog post series where I will reproduce [Eli
 Bendersky’s Adventures In JIT Compilation series][eli], but this time using the
 Rust.
@@ -398,6 +395,11 @@ So now we have everything necessary to build our Brainfuck JIT compiler. We
 will start with our basic interpreter, which will not have any of our applied
 optimizations, except for the precomputed paring brackets, that will be
 compiled down to conditional jumps.
+
+This interpreter will have single pass, which means that it will already emit
+the compiled code while still traversing the source code. In non-singlepass
+compilers, the source code may be entirely collected in a new intermediate
+representation, and then passed to the next pass.
 
 First we need to decide which register will be used for what. I will use the
 `r12` register for the address of the memory of the array of cells, which will

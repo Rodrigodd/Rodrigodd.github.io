@@ -19,3 +19,4 @@ nasm
 mmap
 unalignment
 backtraces
+non-singlepass
