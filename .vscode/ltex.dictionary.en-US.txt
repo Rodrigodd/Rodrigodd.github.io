@@ -17,3 +17,5 @@ Dynasm-rs
 enum
 nasm
 mmap
+unalignment
+backtraces

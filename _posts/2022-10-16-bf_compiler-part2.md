@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  "Compiling Brainfuck code - Part 2: A Single-Pass JIT Compiler"
+title:  "Compiling Brainfuck code - Part 2: A JIT Compiler"
 date:   2022-10-22 12:00:00 -0300
 ---
 
@@ -20,8 +20,6 @@ date:   2022-10-22 12:00:00 -0300
 </span>
 
 To-do's:
- - Fix assembly throughout that lack stack alignment. Also mention functions
-   prologue and epilogue, and the use `rbp`.
  - Check how many times I said "finally".
  - Explicitly mention and define "single-pass".
 
@@ -396,7 +394,7 @@ scratch register to hold long persisted values (which will be only the address
 of the memory and the value of the pointer), and save and restore any preserved
 register that we might be using.
 
-# Part 2 - A JIT Compiler
+# A Singlepass JIT Compiler
 
 So now we have everything necessary to build our Brainfuck JIT compiler. We
 will start with our basic interpreter, which will not have any of our applied
@@ -406,11 +404,38 @@ compiled down to conditional jumps.
 First we need to decide which register will be used for what. I will use the
 `r12` register for the address of the memory of the array of cells, which will
 initially be passed as an argument in the `rdi`, and `r13` will hold the value
-of the pointer.
+of the pointer. Because they are preserved registers, we need to save them
+before we can use them.
 
-So we can start our compiler by saving these two registers, and setting they
-value. I copied the code from the optimized interpreter, keeping the `main`
-function, but modifying the content of `Program` and its methods:
+So we start our compiler by generation our code prelude and epilogue. In
+assembly, the prelude of a function is the code that push the necessary
+registers to the stack and set things like the stack frame, and the epilogue is
+where the registers are popped, etc.
+
+Another thing that the prelude maintain is the stack alignment requirement,
+another aspect of the ABI. In the System V ABI, the stack need to be aligned by
+16 bytes wherever we do a call[^align]. Because the call of the current function push
+the return address to the stack, it starts with unaligned by 8 bytes. We will
+push two registers to the stack, increasing it by 16 bytes, keeping it with the
+same unalignment.
+
+[^align]: If you forget to do that, the called code can misbehave, and
+    some instructions can crash trying to access unaligned memory. Actually, at
+    first I forget about stack alignment, and became very confused when random
+    functions start crashing.
+
+To fix that, we need to decrease the stack pointer by 8 (the stack grows
+downwards), or push another register to the stack. Because we already need to do
+that, I will take the opportunity to maintain the base pointer, `rbp`. `rbp`
+points to the start of the stack frame, and also the previous value of `rbp`.
+This is used for creating backtraces in a debugger for example.
+
+So in the start of our prelude we need to `push rbp` to save the old value, and
+`mov rbp, rsp` to make it point to it.
+
+Now we can put everything together, and start our compiler. I copied the code from the
+optimized interpreter, keeping the `main` function, but modifying the content of
+`Program` and its methods:
 
 ```rust
 use std::io::Write;
@@ -427,11 +452,15 @@ impl Program {
         // ; r13 will be the value of `pointer`
         // ; r12 is got from argument 1 in `rdi`
         // ; r13 is set to 0
+        // push rbp
+        // mov rbp, rsp
         // push r12
         // push r13
         // mov r12, rdi
         // xor r13, r13
         code.write_all(&[
+            0x55, //
+            0x48, 0x89, 0xe5, //
             0x41, 0x54, //
             0x41, 0x55, //
             0x49, 0x89, 0xfc, //
@@ -458,10 +487,12 @@ impl Program {
         // ; to pop them in the opossite order.
         // pop r13
         // pop r12
+        // pop rbp
         // ret
         code.write_all(&[
             0x41, 0x5d, //
             0x41, 0x5c, //
+            0x5d,
             0xc3,
         ])
         .unwrap();
@@ -807,11 +838,15 @@ programs that require run-time assembling. It is inspired by LuaJIT's famous
 To us, this means that we replace code like this:
 
 ```rust
+// push rbp
+// mov rbp, rsp
 // push r12
 // push r13
 // mov r12, rdi
 // xor r13, r13
 code.write_all(&[
+    0x55, //
+    0x48, 0x89, 0xe5, //
     0x41, 0x54, //
     0x41, 0x55, //
     0x49, 0x89, 0xfc, //
@@ -823,13 +858,15 @@ code.write_all(&[
 By this:
 
 ```rust
-dynasm!(code
+dynasm! { code
     ; .arch x64
+    ; push rbp
+    ; mov rbp, rsp
     ; push r12
     ; push r13
-    ; mov r12, rax
+    ; mov r12, rdi
     ; xor r13, r13
-)
+};
 ```
 
 Much easier to maintain. And the `dynasm!` macro compiles that down to a single
@@ -868,6 +905,8 @@ fn new(source: &[u8]) -> Result<Program, UnbalancedBrackets> {
     // r13 is set to 0
     dynasm! { code
         ; .arch x64
+        ; push rbp
+        ; mov rbp, rsp
         ; push r12
         ; push r13
         ; mov r12, rdi
@@ -956,12 +995,15 @@ fn new(source: &[u8]) -> Result<Program, UnbalancedBrackets> {
         return Err(UnbalancedBrackets(']', code.len()));
     }
 
-    // when we push to the stack, we need to remember
-    // to pop them in the opposite order.
+    // when we push to the stack, we need to remeber
+    // to pop them in the opossite order.
     dynasm! { code
         ; .arch x64
+        ; xor rax, rax
+        ; ->exit:
         ; pop r13
         ; pop r12
+        ; pop rbp
         ; ret
     }
 
