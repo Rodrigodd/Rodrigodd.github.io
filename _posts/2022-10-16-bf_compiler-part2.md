@@ -20,7 +20,6 @@ date:   2022-10-22 12:00:00 -0300
 </span>
 
 To-do's:
- - Check how many times I said "finally".
  - Explicitly mention and define "single-pass".
 
 This is the second post of a blog post series where I will reproduce [Eli
@@ -305,7 +304,7 @@ But what we are doing is completely circumventing the memory protection.
 Ideally we should never have exec and write permissions for the same memory.
 
 We can achieve that by allocating memory with read and write permissions, write
-the code to it, and finally change it to read and exec permissions. This can be
+the code to it, and finally changing it to read and exec permissions. This can be
 done with the help of `mprotect`, as long as the given pointer is page aligned,
 which the `mmap` guaranties ([playground][mprot_playground]):
 
@@ -347,8 +346,7 @@ let add1: extern "sysv64" fn(u64) -> u64 = unsafe {
 
 Also, notice that we are leaking the `mmap` allocated memory, you need to call
 `munmap` to free it. I didn't do it here because the program will finish
-immediately after running the code, so the OS will already free it anyway
-[^fn_pointer_safety].
+immediately after running the code, so the OS will already free it anyway[^fn_pointer_safety].
 
 [^fn_pointer_safety]: But also because by leaking the memory, it will have a
     `'static` lifetime, and [it is a necessary condition to have a safe function
@@ -600,7 +598,7 @@ syscalls.
 
 These syscall are the ones that read and write from a file descriptor. To call
 them you need to set the syscall call number to `rax`, pass its arguments using
-the calling convention, and finally execute the instruction `syscall`.
+the calling convention, and finally execute the `syscall` instruction.
 
 The `write` syscall, on x86, has call number 1, and receives as parameter the
 file descriptor (which for stdout is 1) and a pointer and a length for the
@@ -650,7 +648,7 @@ b',' => {
 }
 ```
 
-And finally we need to implement `[` and `]`, which is the tricker. To
+And at last we need to implement `[` and `]`, which is the tricker. To
 implement it we will need to write a conditional relative jump. In assembly, it
 will be like:
 
@@ -1030,8 +1028,8 @@ let code = VecAssembler<X64Relocation>::new();
 Now, on `[`, we create two dynamic labels, one for the start of the loop, and
 one for the end. We use `=>` to use the dynamic label in the assembly, the
 `end_label` go as the parameter of the jump, and `start_label` goes to a
-standalone line, defining the label position. And we finally we put both labels
-at the stack.
+standalone line, defining the label position. And we finish by putting both
+labels at the stack.
 
 ```rust
 b'[' => {

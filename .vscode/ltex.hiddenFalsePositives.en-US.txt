@@ -10,3 +10,4 @@
 {"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QA Singlepass JIT Compiler\\E$"}
 {"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\Q^align: If you forget to do that, the called code can misbehave, and some instructions can crash trying to access unaligned memory.\\E$"}
 {"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QIn the System V ABI, the stack need to be aligned by 16 bytes wherever we do a call^align.\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QI didn't do it here because the program will finish immediately after running the code, so the OS will already free it anyway^fn_pointer_safety.\\E$"}
