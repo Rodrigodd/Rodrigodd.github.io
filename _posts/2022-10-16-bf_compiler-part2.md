@@ -26,7 +26,6 @@ To-do's:
  - Introduce the concept of Runtime, and mention it throughout the post.
  - Check how many times I said "finally".
  - Explicitly mention and define "single-pass".
- - When leaking mmap, talk a little about function pointers safety.
 
 This is the second post of a blog post series where I will reproduce [Eli
 Bendersky’s Adventures In JIT Compilation series][eli], but this time using the
@@ -347,8 +346,17 @@ let add1: extern "sysv64" fn(u64) -> u64 = unsafe {
 };
 ```
 
-Also, notice that we are leaking the `mmap` allocated memory. You need to call
-`munmap` to free it.
+Also, notice that we are leaking the `mmap` allocated memory, you need to call
+`munmap` to free it. I didn't do it here because the program will finish
+immediately after running the code, so the OS will already free it anyway
+[^fn_pointer_safety].
+
+[^fn_pointer_safety]: But also because by leaking the memory, it will have a
+    `'static` lifetime, and [it is a necessary condition to have a safe function
+    pointer][fn_pointer]. Later in the post I am freeing the memory, so I start
+    using a `unsafe fn` pointer.
+
+[fn_pointer]: https://rust-lang.github.io/unsafe-code-guidelines/layout/function-pointers.html
 
 # The calling Convention
 

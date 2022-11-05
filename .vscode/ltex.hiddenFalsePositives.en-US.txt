@@ -3,3 +3,5 @@
 {"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QCranelift is a code generator written in Rust, and used by projects such as Wasmtime and rustc_codegen_cranelift.\\E$"}
 {"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QThe previous part is here({% post_url 2022-10-16-bf_compiler-part1 %}), where we made an optimized brainfuck interpreter.\\E$"}
 {"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QPassing it through the Netwide Assembler (nasm), followed by objdump:\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QI didn't do it here because the program will finish immediately after running the code, so the OS will already free it anyway ^fn_pointer_safety.\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\Q^fn_pointer_safety: But also because by leaking the memory, it will have a \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q lifetime, and it is a necessary condition to have a safe function pointer.\\E$"}
