@@ -20,7 +20,6 @@ date:   2022-10-22 12:00:00 -0300
 </span>
 
 To-do's:
- - Talk more about the x86 ISA, like how the register nomenclature work.
  - Fix assembly throughout that lack stack alignment. Also mention functions
    prologue and epilogue, and the use `rbp`.
  - Check how many times I said "finally".
@@ -163,29 +162,32 @@ To write a JIT compiler, you need basically do things:
 
 ### Generating machine code
 
-Machine code is basically a binary encoding for the instructions that the
+Machine code is basically the binary encoding for the instructions that the
 processor execute, and assembly is the human-readable encoding of these
-instructions. And an assembler is the program that convert assembly to
-the machine code.
+instructions. An assembler is the program that convert assembly to the machine
+code.
 
 For example, take the assembly instruction that was implementing the `+` in the
 assembly at the start of the post, was `add byte ptr [r13 + rsi + 40], 1`,
 which is an instruction that adds the immediate value `1` to the byte at the
 address given by `r13 + rsi + 40`. 
 
-If you follow the encoding steps for this instruction (which I tried, but
+If you follow the [encoding steps] for this instruction (which I tried, but
 discovered that this would take much more time to learn that I expected), or
 use an assembler as a sane person would do, you will discover that these
 instructions is encoded by the byte sequence `0x41 0x80 0x44 0x35 0x28 0x01`.
 
-And there is no secret for encoding multiples instructions, you only need
-to encode each one, and concatenate them together.
+[encoding steps]: https://www.systutorials.com/beginners-guide-x86-64-instruction-encoding/
 
-And we also need to make sure to terminate our instructions sequence. In our
-case it will be a `ret` instruction, which will return the execution from the
-generated code, back to our Rust code, was we will see in the next section.
-But this also could be a `exit` syscall, which would terminate the entire
-program.
+So when we create our compiler, we need to emit the machine code of each
+instruction one after another, forming our desired program.
+
+And we also need to make sure to terminate our program with some termination
+instruction, otherwise the processor would start executing any random bytes that
+happens to be after the last instruction. In our case it will be a `ret`
+instruction, which will return the execution from the generated code, back to
+our Rust code, was we will see in the next section. But this also could be a
+`exit` syscall, which would terminate the entire program.
 
 As an example, there is the assembly for a function that adds 1 to its 64-bit
 argument and return it:
@@ -380,6 +382,14 @@ The scratch registers are the opposite, they can be modified by a function
 call. This also means that if we need a value of one of these register, we
 need to save them (in another register, or on the stack) before executing a
 call.
+
+[Here is the quick reference] that I am using to check the register
+names [^weird_name] and types.
+
+[^weird_name]: The name of the register in x64 are not very intuitive, due to
+    backward compatibility. The same register can be accessed in different sizes,
+    and each size has a different name. Also, some registers are named after
+    letters, and some after numbers.
 
 So when we start writing our compiled code, we need to be sure not use a
 scratch register to hold long persisted values (which will be only the address
@@ -1024,7 +1034,7 @@ code for us, but also provides a nice cross-platform abstraction[^memmap2],
 that will be useful for my eventual Windows support.
 
 [^memmap2]: Actually these dynasm types uses [memmap2] abstractions underneath,
-  the de facto crate for memory mapping.
+    the de facto crate that offer a safe API for memory mapping.
 
 [memmap2]: https://crates.io/crates/memmap2
 

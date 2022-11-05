@@ -5,3 +5,5 @@
 {"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QPassing it through the Netwide Assembler (nasm), followed by objdump:\\E$"}
 {"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QI didn't do it here because the program will finish immediately after running the code, so the OS will already free it anyway ^fn_pointer_safety.\\E$"}
 {"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\Q^fn_pointer_safety: But also because by leaking the memory, it will have a \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q lifetime, and it is a necessary condition to have a safe function pointer.\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QHere is the quick reference that I am using to check the register names ^weird_name and types.\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\Q^weird_name: The name of the register in x64 are not very intuitive, due to backward compatibility.\\E$"}
