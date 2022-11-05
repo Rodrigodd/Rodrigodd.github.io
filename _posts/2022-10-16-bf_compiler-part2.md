@@ -20,8 +20,6 @@ date:   2022-10-22 12:00:00 -0300
 </span>
 
 To-do's:
- - mention ARM as well when first talking about x86, and retook that
-   information when talking about cross-platform at end of the post.
  - Talk more about the x86 ISA, like how the register nomenclature work.
  - Fix assembly throughout that lack stack alignment. Also mention functions
    prologue and epilogue, and the use `rbp`.
@@ -142,7 +140,8 @@ instructions encoded by different machine code.
 
 In this post, we will be generating machine code for the x86-64 CPU
 architecture, which is the most common processor architecture used by personal
-computers today.
+computers today. But you want to target mobile devices, or the newer Macs, you
+would need to target an ARM architecture, like AArch64.
 
 A JIT compiler is a compiler that compiles just-in-time. That is, it compiles
 the program to machine code only just before executing it. This is the opposite
@@ -1343,10 +1342,15 @@ and using `mov [r12 + r13], r14` where `r14` is register with the value 0 would
 be faster than `mov [r12 + r13], 0`. We could also check if two instructions are
 reading the same cell twice, and optimize that. Etc.
 
+But these types of optimizations need a deep understanding of the target
+instructions set and how each instruction is executed by the processor
+(knowledge that I don't have). And this knowledge need to exist for each
+architecture that your program is targeting, and there are dozens of them!
+
 To solve that problem is why exist projects such as [GCC] and [LLVM]. They make
 that languages implementations just need to worry about emitting they code to
 these projects corresponding intermediate representation (IR), and they take the
-job of choosing the optimal instructions to emit. But they also take care of
+job of choosing the optimal instructions to emit. And they also take care of
 applying optimizations to the code.
 
 [gcc]: https://gcc.gnu.org/
@@ -1359,8 +1363,10 @@ And this is exactly what we will explore in the next post in this series. The
 original series by Eli Bendersky have [made use of LLVM], but I follow a more
 Rusty approach and use [Cranelift] instead. Cranelift is a code generator
 written in Rust, and used by projects such as [Wasmtime] and
-[rustc_codegen_cranelift]. It does not apply a lot of optimizations, but it does
-solve the problem of multiple architecture targeting.
+[rustc_codegen_cranelift]. It does not apply a lot of optimizations, so maybe we
+don't get it to our optimized JIT implementation (we will see). But it does
+solve the problem of multiple architecture targeting, so I will be able to run
+our compiler on my Android device, that uses ARM.
 
 [made use of LLVM]: https://eli.thegreenplace.net/2017/adventures-in-jit-compilation-part-3-llvm/
 [Cranelift]: https://github.com/bytecodealliance/wasmtime/tree/main/cranelift
