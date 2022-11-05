@@ -192,7 +192,7 @@ mov rax, rdi  ; the return value is rax, so I move rdi to rax
 ret           ; return from the function
 ```
 
-Passing it through the [Netwide Assembler] (nasm), followed by [objdump]:
+Passing it through the [Netwide Assembler], followed by [objdump]:
 
 [Netwide Assembler]: https://www.nasm.us/
 [objdump]: https://linux.die.net/man/1/objdump
@@ -342,8 +342,10 @@ let add1: extern "sysv64" fn(u64) -> u64 = unsafe {
 ```
 
 Also, notice that we are leaking the `mmap` allocated memory, you need to call
-`munmap` to free it. I didn't do it here because the program will finish
+[`munmap`] to free it. I didn't do it here because the program will finish
 immediately after running the code, so the OS will already free it anyway[^fn_pointer_safety].
+
+[`munmap`]: https://man7.org/linux/man-pages/man2/munmap.2.html
 
 [^fn_pointer_safety]: But also because by leaking the memory, it will have a
     `'static` lifetime, and [it is a necessary condition to have a safe function
@@ -779,7 +781,9 @@ fn run(&mut self) -> std::io::Result<()> {
 ```
 
 And after using a debugger to step through the generated assembly and fixing
-errors in the assembly, I finally get to measure its performance:
+errors in the assembly, [it's finished]! I finally get to measure its performance:
+
+[it's finished]: https://github.com/Rodrigodd/bf-compiler/blob/bc3e2aa8588dfd0cb543632e6cb729bf62977f13/singlepass-jit/src/main.rs
 
 ![](/assets/brainfuck/plot8.svg){:style="display:block; margin-left:auto; margin-right:auto"}
 
@@ -1230,9 +1234,11 @@ unsafe {
 }
 ```
 
-And done! We have an implementation that is 100% comparable with our first
+[And done]! We have an implementation that is 100% comparable with our first
 interpreter. Besides, these changes was already enough make the program
 compatible with Windows.
+
+[And done]: https://github.com/Rodrigodd/bf-compiler/blob/f5a15d4533cc4cb130db38a9f2ba10151ab06f0b/singlepass-jit/src/main.rs
 
 If we look at its performance:
 
@@ -1251,10 +1257,12 @@ implementation, because we are collection all instructions before doing the
 compilation. For this to remain as a single-pass implementation, we would need
 to emit and process `Instructions` one at a time. This can be done, but because
 some instructions are made up from smaller instruction (like `Clear`), this
-would be a little trick. But let's not focus on that.
+would be a little trick. So let's not focus on that.
 
-[Here is the commit where I added the enum and parsing]. I also clean up the
+[Here is the commit where I added the enum and parsing][enum_parsing]. I also clean up the
 unnecessary precomputation of paring bracket, that now happens in compilation.
+
+[enum_parsing]: https://github.com/Rodrigodd/bf-compiler/commit/626bb9b0e3357974846c46e2546c0e33a9aea26f
 
 Now we can start writing the compilation, of the instructions. In this case,
 the implementation of `JumpRight`, `JumpLeft`, `Input` and `Ouput` continued to
@@ -1384,7 +1392,9 @@ Instruction::MoveUntil(n) => dynasm! { code
 },
 ```
 
-And our optimized JIT compiler is complete! Measuring its performance:
+And our [optimized JIT compiler is complete]! Measuring its performance:
+
+[optimized JIT compiler is complete]: https://github.com/Rodrigodd/bf-compiler/blob/872c0c852cba21445a2982be02411a8c22cdc078/optimized-jit/src/main.rs
 
 ![](/assets/brainfuck/plot10.svg){:style="display:block; margin-left:auto; margin-right:auto"}
 
