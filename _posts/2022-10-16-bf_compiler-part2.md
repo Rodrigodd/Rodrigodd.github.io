@@ -28,10 +28,6 @@ To-do's:
  - Introduce the concept of Runtime, and mention it throughout the post.
  - Check how many times I said "finally".
  - Explicitly mention and define "single-pass".
- - Add final words cite optimizations opportunities, like using `xor eax, eax`
-   instead of `xor rax, rax`, and `mov [r12 + r13], zero-register` instead of
-   `mov [r12 + r13], 0`.
- - Do a benchmark after finishing the cross compatibility.
  - Mention nasm instead of gnu assembler.
  - When leaking mmap, talk a little about function pointers safety.
 
@@ -129,11 +125,10 @@ when running a `+` and `-` instructions.
 This is a lesser problem for brainfuck instructions with bigger
 implementations, like the `>` there, who has a very involved wrapping
 calculation (could be greatly improved by the memory length being a power of
-2), but the overhead is still very significant.
+2), but the overhead is still very significant, almost 2x.
 
-But we could lay the implementation of each instruction one after another,
-eliminating all these extra instructions, including the jump table branching,
-for a massive speedup.
+This roughly means that if we could eliminate this overhead, we can have
+something between 2x and 13x of performance increase!
 
 And to achieve this we will implement a JIT compiler.
 
@@ -737,9 +732,9 @@ fn run(&mut self) -> std::io::Result<()> {
 And after using a debugger to step through the generated assembly and fixing
 errors in the assembly, I finally get to measure its performance:
 
-// Bench here //
+![](/assets/brainfuck/plot8.svg){:style="display:block; margin-left:auto; margin-right:auto"}
 
-It is almost 7 times faster than the interpreted one! This is within the
+It is almost 7 times faster than the interpreted one! It is within the
 expected performance increase from the analysis of the interpreter overhead. 
 
 The comparison is not yet fair with the basic interpreter, because we still
@@ -1179,6 +1174,12 @@ And done! We have an implementation that is 100% comparable with our first
 interpreter. Besides, these changes was already enough make the program
 compatible with Windows.
 
+If we look at its performance:
+
+![](/assets/brainfuck/plot9.svg){:style="display:block; margin-left:auto; margin-right:auto"}
+
+It continues to be within the margin of error of the previous one.
+
 # An Optimized JIT compiler
 
 And now implementing A JIT compiled version of our optimized interpreter becomes
@@ -1325,25 +1326,22 @@ Instruction::MoveUntil(n) => dynasm! { code
 
 And our optimized JIT compiler is complete! Measuring its performance:
 
-// BENCH //
+![](/assets/brainfuck/plot10.svg){:style="display:block; margin-left:auto; margin-right:auto"}
 
 And was expected, the performance increase is big! More than 3x faster.
 
 
 # Future work
 
-We manage to create a 22x performance increase since our first Interpreter. But
-we can always do better. One possibility is to investigate what choice of
-instructions could result in a better performance. For example, using `xor eax,
-eax` instead of `xor rax, rax` would result in a smaller instruction, and using
-`mov [r12 + r13], r14` where `r14` is register with the value 0 would be faster
-than `mov [r12 + r13], 0`. We could also check if two instructions are reading
-the same cell twice, and optimize that. Etc.
+![](/assets/brainfuck/plot11.svg){:style="display:block; margin-left:auto; margin-right:auto"}
 
-But these types of optimizations need a deep understanding of the instructions
-set and how each instruction is executed by the processor (knowledge that I
-don't have). And this knowledge need to exist for each architecture that your
-program is targeting, and there are dozens of them!
+We manage to create more than 26x performance increase since our first
+Interpreter. But we can always do better. One possibility is to investigate what
+choice of instructions could result in a better performance. For example, using
+`xor eax, eax` instead of `xor rax, rax` would result in a smaller instruction,
+and using `mov [r12 + r13], r14` where `r14` is register with the value 0 would
+be faster than `mov [r12 + r13], 0`. We could also check if two instructions are
+reading the same cell twice, and optimize that. Etc.
 
 To solve that problem is why exist projects such as [GCC] and [LLVM]. They make
 that languages implementations just need to worry about emitting they code to
