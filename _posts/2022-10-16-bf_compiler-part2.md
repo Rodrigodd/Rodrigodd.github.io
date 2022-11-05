@@ -23,7 +23,6 @@ To-do's:
  - Talk more about the x86 ISA, like how the register nomenclature work.
  - Fix assembly throughout that lack stack alignment. Also mention functions
    prologue and epilogue, and the use `rbp`.
- - Introduce the concept of Runtime, and mention it throughout the post.
  - Check how many times I said "finally".
  - Explicitly mention and define "single-pass".
 
@@ -1054,8 +1053,8 @@ fn run(&mut self) -> std::io::Result<()> {
 Now with our enhanced workflow, we can continue to implement the final details
 necessary for our JIT compiler be 100% compatible with our basic interpreter.
 For that we need to retry the read/write syscall until all bytes are written,
-check if any of the calls return an error and return to the runtime, and check
-if reach the end-of-file of the stdin and fallback to the value 0.
+check if any of the calls return an error and return it to the Rust code, and
+check if the stdin reached the end-of-file and fallback to the value 0.
 
 That is a lot of code to be implemented in assembly. But thankfully we not need
 to! We can instead implement every thing in Rust (minus the return of the
