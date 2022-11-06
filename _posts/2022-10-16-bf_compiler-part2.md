@@ -6,10 +6,10 @@ date:   2022-10-22 12:00:00 -0300
 
 This is the second post of a blog post series where I will reproduce [Eli
 Bendersky’s Adventures In JIT Compilation series][eli], but this time using the
-Rust.
+[Rust programming language][rust].
 
 [eli]: https://eli.thegreenplace.net/2017/adventures-in-jit-compilation-part-1-an-interpreter
-[rust]: https://www.rust-lang.org
+[Rust]: https://www.rust-lang.org
 
 The [previous part is here]({% post_url 2022-10-16-bf_compiler-part1 %}), where
 we made an optimized brainfuck interpreter. In this part we will make a
@@ -26,7 +26,7 @@ assembly for the main loop of our interpreter, were the majority of the runtime
 is spent.
 
 In this case, I used [cargo-show-wasm] to get the x86 assembly for
-`Program::run`, and after a lot clean up I got the following:
+`Program::run`, and (after a lot clean up) I got the following:
 
 [cargo-show-wasm]: https://github.com/pacak/cargo-show-asm
 
@@ -84,23 +84,27 @@ In this case, I used [cargo-show-wasm] to get the x86 assembly for
 ```
 
 I added some comments to the assembly to make it a little more clear what is
-going on, but the main point here is the amount of opcodes that is used to
-implement the interpreter loop compared to the opcodes used for the brainfuck
-instructions. 
+going on, but the main point here is the amount of instructions that is used to
+implement the interpreter loop compared to the amount used for the brainfuck
+operations. 
 
 The `+` and `-` operations are being implemented by a single assembly
 instruction (the `add byte ptr [r13 + rsi + 40], 1`), but after executing each
 instruction it needs to do a jump and run everything in the `.PROGRAM` block,
 who has 12 instructions. Instructions count is not a very precise performance
 parameter, but this roughly means that the interpreter has an overhead of 13x
-when running a `+` and `-` instructions.
+when running a `+` or `-` operation.
 
-This is a lesser problem for brainfuck instructions with bigger
+This is a lesser problem for brainfuck operations with bigger
 implementations, like the `>` there, who has a very involved wrapping
 calculation (could be greatly improved by the memory length being a power of
-2), but the overhead is still very significant, almost 2x.
+2)[^could_be_better], but the overhead is still very significant, almost 2x.
 
-This roughly means that if we could eliminate this overhead, we can have
+[^could_be_better]: Actually, this can already be greatly improved by using
+    conditional logic instead, as we will discover later when compiling this
+    operation.
+
+This roughly means that if we could eliminate the loop overhead, we can have
 something between 2x and 13x of performance increase!
 
 And to achieve this we will implement a JIT compiler.
@@ -108,15 +112,17 @@ And to achieve this we will implement a JIT compiler.
 # What is a compiler and a JIT compiler
 
 A compiler is basically a program that transforms our high level code, easy to
-write and understand, to a lower lever code, easy to execute. In this case, we
-will compile our brainfuck code to *machine code*, the code of the instructions
-executed by the computer's processor. Each processor has a different set of
-instructions encoded by different machine code.
+write and understand, to a lower level code, easy to execute. In this case, we
+will compile our brainfuck code to *machine code*, the code used by the
+computer's processor to execute instructions. 
+
+Each processor architecture has a different set of instructions, that are
+encoded by different machine code formats.
 
 In this post, we will be generating machine code for the x86-64 CPU
 architecture, which is the most common processor architecture used by personal
-computers today. But you want to target mobile devices, or the newer Macs, you
-would need to target an ARM architecture, like AArch64.
+computers today. But if you want to target mobile devices, or the newer Macs,
+you will probably also want to target AArch64.
 
 A JIT compiler is a compiler that compiles just-in-time. That is, it compiles
 the program to machine code only just before executing it. This is the opposite
@@ -125,7 +131,7 @@ native executables before distributing them.
 
 JIT compilers have a series of advantages, like not needing to distribute
 multiple versions of each program compiled for each architecture and operating
-system, or being able to apply optimizations specifics to the particular
+system, or being able to apply optimizations specific to each particular
 computer and runtime workload. 
 
 But also, it needs less knowledge to implement a JIT compiler than to create
@@ -147,19 +153,21 @@ instructions. An assembler is the program that convert assembly to the machine
 code.
 
 For example, take the assembly instruction that was implementing the `+` in the
-assembly at the start of the post, was `add byte ptr [r13 + rsi + 40], 1`,
+assembly at the start of the post. It was `add byte ptr [r13 + rsi + 40], 1`,
 which is an instruction that adds the immediate value `1` to the byte at the
-address given by `r13 + rsi + 40`. 
+address given by `r13 + rsi + 40` (on intel's assembly syntax, the first operant
+of an instruction is the target of the operation, and the second is the source). 
 
 If you follow the [encoding steps] for this instruction (which I tried, but
 discovered that this would take much more time to learn that I expected), or
-use an assembler as a sane person would do, you will discover that these
-instructions is encoded by the byte sequence `0x41 0x80 0x44 0x35 0x28 0x01`.
+use an assembler as a sane person would do, you will discover that this
+instruction is encoded by the byte sequence `0x41 0x80 0x44 0x35 0x28 0x01`.
 
 [encoding steps]: https://www.systutorials.com/beginners-guide-x86-64-instruction-encoding/
 
-So when we create our compiler, we need to emit the machine code of each
-instruction one after another, forming our desired program.
+When we create our compiler, we will emit a series of instructions that
+implement our desired program. To encode multiple instructions, you simply need to
+concatenate the encoding of each instruction.
 
 And we also need to make sure to terminate our program with some termination
 instruction, otherwise the processor would start executing any random bytes that
@@ -177,7 +185,8 @@ mov rax, rdi  ; the return value is rax, so I move rdi to rax
 ret           ; return from the function
 ```
 
-Passing it through the [Netwide Assembler], followed by [objdump]:
+Passing it through the [Netwide Assembler], followed by [objdump], we get the
+machine code:
 
 [Netwide Assembler]: https://www.nasm.us/
 [objdump]: https://linux.die.net/man/1/objdump
@@ -197,7 +206,7 @@ Disassembly of section .text:
    7:	c3                   	ret    
 ```
 
-And we could write that in a rust program:
+And we could write it in a Rust program:
 
 ```rust
 let add1 = [
@@ -286,7 +295,7 @@ But what we are doing is completely circumventing the memory protection.
 Ideally we should never have exec and write permissions for the same memory.
 
 We can achieve that by allocating memory with read and write permissions, write
-the code to it, and finally changing it to read and exec permissions. This can be
+the code to it, and then change it to read and exec permissions. This can be
 done with the help of `mprotect`, as long as the given pointer is page aligned,
 which the `mmap` guaranties ([playground][mprot_playground]):
 
@@ -358,23 +367,24 @@ call does not change. This means that when we generate our function, we need
 to save these register on the stack before using them, and must restore them
 before returning.
 
-The scratch registers are the opposite, they can be modified by a function
-call. This also means that if we need a value of one of these register, we
-need to save them (in another register, or on the stack) before executing a
-call.
+The scratch registers are the opposite, they can be modified by a function call.
+This also means that if we will need a value of one of these register, we need
+to save them (in another register, or on the stack) before executing a call.
 
 [Here is the quick reference] that I am using to check the register
-names [^weird_name] and types.
+names[^weird_name] and types.
 
-[^weird_name]: The name of the register in x64 are not very intuitive, due to
+[Here is the quick reference]: https://www.cs.uaf.edu/2017/fall/cs301/reference/x86_64.html
+
+[^weird_name]: The names of the registers in x64 are not very intuitive, due to
     backward compatibility. The same register can be accessed in different sizes,
     and each size has a different name. Also, some registers are named after
     letters, and some after numbers.
 
-So when we start writing our compiled code, we need to be sure not use a
+So when we start writing our compiled code, we need to be sure to not use a
 scratch register to hold long persisted values (which will be only the address
-of the memory and the value of the pointer), and save and restore any preserved
-register that we might be using.
+of the memory and the value of the pointer), and remember to save and restore
+any preserved register that we might be using.
 
 # A Singlepass JIT Compiler
 
@@ -391,8 +401,7 @@ representation, and then passed to the next pass.
 First we need to decide which register will be used for what. I will use the
 `r12` register for the address of the memory of the array of cells, which will
 initially be passed as an argument in the `rdi`, and `r13` will hold the value
-of the pointer. Because they are preserved registers, we need to save them
-before we can use them.
+of the pointer. Because they are preserved registers, we need to save them.
 
 So we start our compiler by generation our code prelude and epilogue. In
 assembly, the prelude of a function is the code that push the necessary
@@ -414,8 +423,10 @@ same unalignment.
 To fix that, we need to decrease the stack pointer by 8 (the stack grows
 downwards), or push another register to the stack. Because we already need to do
 that, I will take the opportunity to maintain the base pointer, `rbp`. `rbp`
-points to the start of the stack frame, and also the previous value of `rbp`.
+points to the start of the [stack frame], and also the previous value of `rbp`.
 This is used for creating backtraces in a debugger for example.
+
+[stack frame]: https://en.wikipedia.org/wiki/Call_stack#Structure
 
 So in the start of our prelude we need to `push rbp` to save the old value, and
 `mov rbp, rsp` to make it point to it.
@@ -509,12 +520,12 @@ b'-' => {
 }
 ```
 
-The `>` and `<` could be a single instruction, `add r13, 1` and `add r13, -1`,
-but also need to implement the wrapping behavior. I used module operator to
+The `>` and `<` could also be a single instruction, `add r13, 1` and `add r13,
+-1`, but we need to implement the wrapping behavior. I used module operator to
 implement that in the interpreter, but I discovered that operation is very slow
-to perform, and the compiler decided to use some [compiler magic], that
-resulted in that big series of multiplications and shifts in the disassembly
-seen at the start of this post.
+to perform, and the compiler decided to use some [compiler magic], that resulted
+in that big series of multiplications and shifts in the disassembly seen at the
+start of this post.
 
 [compiler magic]: https://stackoverflow.com/questions/4361979/how-does-the-gcc-implementation-of-modulo-work-and-why-does-it-not-use-the
 
@@ -524,7 +535,7 @@ implementation, but it will be easier to write.
 
 Using [this playground's ASM output], I got the following implementation:
 
-[this playground's ASM ouput]: https://play.rust-lang.org/?version=stable&mode=release&edition=2021&gist=ab83982a30b0712f0985a99d1658717f
+[this playground's ASM output]: https://play.rust-lang.org/?version=stable&mode=release&edition=2021&gist=ab83982a30b0712f0985a99d1658717f
 
 ```nasm
 playground::add1:
@@ -543,7 +554,7 @@ playground::sub1:
 
 Which does not contain branching at all! Only a conditional move (didn't know
 that instructions existed). So there is a high change that this will be better
-than the previous optimization.
+than the interpreter implementation.
 
 So, after changing the register to the ones we are using, and inverting some
 conditions, we get the following:
@@ -589,10 +600,10 @@ These syscall are the ones that read and write from a file descriptor. To call
 them you need to set the syscall call number to `rax`, pass its arguments using
 the calling convention, and finally execute the `syscall` instruction.
 
-The `write` syscall, on x86, has call number 1, and receives as parameter the
-file descriptor (which for stdout is 1) and a pointer and a length for the
-buffer whose content will be written. It returns the number of bytes written, or
--1 in case of error.
+The `write` syscall, on x86-64 Linux, has call number 1, and receives as
+parameter the file descriptor (which for stdout is 1) and a pointer and a length
+for the buffer whose content will be written. It returns the number of bytes
+written, or -1 in case of error.
 
 You are expected to handle the error, or cases where the entire buffer was not
 written, but I will avoid writing too much complicate assembly for now, it will
@@ -616,7 +627,7 @@ b'.' => {
 }
 ```
 
-The `read` syscall is very similar, but its call number is 0, but it writes to
+The `read` syscall is very similar, but its call number is 0, and it writes to
 the passed buffer. Also, now we pass the file descriptor 0, which is the stdin:
 
 ```rust
@@ -692,8 +703,8 @@ b'[' => {
 
 And every time we encounter a `]`, we pop the index from the stack, compute the
 offset, and fix the offset of the last jump. Note that the offset that the
-encoded jump receives is from the address of the instruction after the jump, to
-the address of the target instruction.
+encoded jump receives is from the address of the next instruction, to the
+address of the target instruction.
 
 ```rust
 b']' => {
@@ -765,8 +776,8 @@ fn run(&mut self) -> std::io::Result<()> {
 }
 ```
 
-And after using a debugger to step through the generated assembly and fixing
-errors in the assembly, [it's finished]! I finally get to measure its performance:
+And after using a debugger to step through the generated assembly, going back
+and fixing them, [it's finished]! I finally get to measure its performance:
 
 [it's finished]: https://github.com/Rodrigodd/bf-compiler/blob/bc3e2aa8588dfd0cb543632e6cb729bf62977f13/singlepass-jit/src/main.rs
 
@@ -780,7 +791,7 @@ need to check and return the errors from the `write` and `read` syscall and
 implement the EOF behavior. But these changes will only make it a little
 slower (only a little, IO is the least common instruction).
 
-Even so, the optimized interpreter is still faster than this JIT compiler.
+Even so, the optimized interpreter is still at par with this JIT compiler.
 Nevertheless, nothing prevent us to apply the exact optimizations used in the
 interpreter, and on top of that compile them to machine code.
 
@@ -792,12 +803,12 @@ improve our workflow.
 My workflow for writing this JIT compiler was the following:
 
 1. Inspect some assembly emitted from Rust, to learn how to implement the
-   instruction.
-2. Write its assembly to a temporary file.
+   operation.
+2. Write assembly to a temporary file.
 3. Assemble and disassemble the assembly to get the machine code, using `nasm
    test.s -felf64 && objdump -M intel -d test.o`
 4. Copy the hexadecimal output to my JIT source code.
-5. Test it, go back to step 2 if failed.
+5. Test it, go back to step 2 if didn't work.
 
 This workflow is not so bad, at least I don't need to read Intel's
 documentation to discover how to encode the instructions. Well... I still need
@@ -805,9 +816,9 @@ to search a little when I need to dynamically set some parameter of the
 instruction.
 
 Steps 1 and 5 are unavoidable, but steps 2, 3 and 4 creates a big overhead over
-the iterative process, and introduce new error points. And if somehow a typo is
+the iterative process, and introduce new error points. If somehow a typo is
 introduced in one the bytes of the machine code, the only reasonable way of
-discovery which one is to disassemble them again.
+discovery which one is by disassembling them again.
 
 What would really help would be if I could write the assembly directly in my
 Rust source code, and it assembles it to a byte sequence at compile time. Better
@@ -815,7 +826,7 @@ yet if it could automatically figure out how to inject dynamic parameter in the
 machine code.
 
 And every thing describe here can be implemented using Rust procedural macros.
-And has already been done.
+And has already been done!
 
 [Dynasm-rs] is a dynamic assembler for Rust, a tool that ease the creation of
 programs that require run-time assembling. It is inspired by LuaJIT's famous
@@ -860,9 +871,11 @@ dynasm! { code
 
 Much easier to maintain. And the `dynasm!` macro compiles that down to a single
 `code.extend()` call. But for the remainder of the assembly blocks, dynasm will
-rely on more methods of its [`DynasmApi`], that can be found in the `dynasmrt` crate.
+rely on more methods of its [`DynasmApi`], that can be found in the [`dynasmrt`] crate.
 
 [`DynasmApi`]: https://docs.rs/dynasmrt/1.2.3/dynasmrt/trait.DynasmApi.html
+
+[`dynasmrt`]: https://docs.rs/dynasmrt/1.2.3/dynasmrt
 
 But we will need only a handful of them, so we don't need to import
 `dynasmrt` (yet), and instead copy the trait to our code:
@@ -1011,13 +1024,16 @@ So first can replace our simple `Vec<u8>` + ad-hoc extension trait, by
 `dynasmrt::VecAssembler`:
 
 ```rust
-use dynasmrt::{dynasm, x64::X64Relocation, DynasmApi, DynasmLabelApi, VecAssembler};
+use dynasmrt::{
+    dynasm, x64::X64Relocation, DynasmApi, 
+    DynasmLabelApi, VecAssembler
+};
 
 let code = VecAssembler<X64Relocation>::new();
 ```
 
 Now, on `[`, we create two dynamic labels, one for the start of the loop, and
-one for the end. We use `=>` to use the dynamic label in the assembly, the
+one for the end. We use `=>` to use the dynamic label inside the macro. The
 `end_label` go as the parameter of the jump, and `start_label` goes to a
 standalone line, defining the label position. And we finish by putting both
 labels at the stack.
@@ -1026,6 +1042,7 @@ labels at the stack.
 b'[' => {
     let start_label = code.new_dynamic_label();
     let end_label = code.new_dynamic_label();
+
     dynasm! { code
         ; .arch x64
         ; cmp BYTE [r12+r13], 0
@@ -1038,7 +1055,7 @@ b'[' => {
 ```
 
 And on `]`, we pop the labels from the stack, and use them in
-a similar way, but with opposite labels:
+a similar way:
 
 ```rust
 b']' => {
@@ -1051,13 +1068,14 @@ b']' => {
         ; .arch x64
         ; cmp BYTE [r12 + r13], 0
         ; jne =>start_label
-        ; => end_label
+        ; =>end_label
     };
 }
 ```
 
-And with that we used all dynasm features that we need for writing the assembly.
-But it also has some other help utilities for running our generated code.
+Now we don't need to know how the jump offsets are encoded!
+
+Dynasm also has some help utilities for running our generated code.
 
 We can replace our unsafe calls to `mmap`, `mprotect` and `munmap` by dynasm's
 `MutableBuffer` and `ExecutableBuffer`. Not only they encapsulate the unsafe 
@@ -1065,8 +1083,9 @@ code for us, but also provides a nice cross-platform abstraction[^memmap2],
 that will be useful for my eventual Windows support.
 
 [^memmap2]: Actually these dynasm types uses [memmap2] abstractions underneath,
-    the de facto crate that offer a safe API for memory mapping.
-
+    the de facto crate that offer a safe and cross-platform API for memory
+    mapping.
+ 
 [memmap2]: https://crates.io/crates/memmap2
 
 So, our `Program::run` becomes:
@@ -1094,18 +1113,17 @@ fn run(&mut self) -> std::io::Result<()> {
 Now with our enhanced workflow, we can continue to implement the final details
 necessary for our JIT compiler be 100% compatible with our basic interpreter.
 For that we need to retry the read/write syscall until all bytes are written,
-check if any of the calls return an error and return it to the Rust code, and
+check if any of the calls return an error and repass it to the Rust code, and
 check if the stdin reached the end-of-file and fallback to the value 0.
 
 That is a lot of code to be implemented in assembly. But thankfully we not need
-to! We can instead implement every thing in Rust (minus the return of the
-error)!
+to! We can instead implement every thing in Rust! (minus the error repass)
 
 We only need to declare a Rust function with the proper ABI, and call it
 directly from the assembly.
 
 Not only it will make implementing all this much easier, we also get a
-cross-platform implementation for free.
+cross-platform implementation.
 
 We can directly copy the code from our interpreter and put in a `extern
 "sysv64" fn(*const u8)` function, and call it from our generated code.
@@ -1158,12 +1176,12 @@ unsafe extern "sysv64" fn read(buf: *mut u8) -> *mut std::io::Error {
 }
 ```
 
-Now we only need to call these functions in the assembly. For that we get the 
-functions addresses, move them to a register, and do indirect call from the register.
-The call will return a non-null pointer in case of an error, so we can check that
-and return early if necessary.
+Now we only need to call these functions in the assembly. For that we get the
+functions addresses, move them to a register, and do an indirect call from the
+register. The call will return a non-null pointer in case of an error, so we can
+check that and return early if necessary.
 
-To return early we will a jump to a dynasm's global label:
+To return early we will a jump to a dynasm's global label, denoted by `->`:
 
 ```rust
 b'.' => {
@@ -1220,7 +1238,7 @@ unsafe {
 ```
 
 [And done]! We have an implementation that is 100% comparable with our first
-interpreter. Besides, these changes was already enough make the program
+interpreter. Besides, these changes are already enough to make the program
 compatible with Windows.
 
 [And done]: https://github.com/Rodrigodd/bf-compiler/blob/f5a15d4533cc4cb130db38a9f2ba10151ab06f0b/singlepass-jit/src/main.rs
@@ -1249,9 +1267,8 @@ unnecessary precomputation of paring bracket, that now happens in compilation.
 
 [enum_parsing]: https://github.com/Rodrigodd/bf-compiler/commit/626bb9b0e3357974846c46e2546c0e33a9aea26f
 
-Now we can start writing the compilation, of the instructions. In this case,
-the implementation of `JumpRight`, `JumpLeft`, `Input` and `Ouput` continued to
-be exactly the same.
+Now we can start compiling the instructions. The implementation of `JumpRight`,
+`JumpLeft`, `Input` and `Ouput` continued to be exactly the same.
 
 For the `Add(u8)`, we only need to use `value` as the operant of the
 instructions, instead of the hard-coded `1`:
@@ -1291,10 +1308,9 @@ Instruction::Move(n) => {
 }
 ```
 
-This show one of the benefits of JIT compilation, I only know if `n` is positive
-or negative at runtime, but because I JIT compiling, I generate code optimized
-for each case.
-
+This show one of the benefits of JIT compilation. At this point I know if `n` is
+positive or negative, so because I am JIT compiling, I can generate code
+optimized for each case.
 
 For the `Clear` we simply move 0 to the cell.
 
@@ -1335,13 +1351,11 @@ Instruction::AddTo(n) => dynasm! { code
 },
 ```
 
+Here we can see that we can use `;;` to inline rust code inside the `dynasm`
+macro.
+
 And for the `MoveUntil(i32)` instructions we, create a loop where we check for
 zero, exit the loop if true, otherwise do a move and repeat.
-
-Here I used two unseen features of dynasm. Local labels, denoted by `:` and `<`
-or `>` depending on if the jump is backwards or forwards, and `;;` that allow us
-to include Rust code inside the macro. Also notice that I copied the code from
-`Move(i32)` here.
 
 ```rust
 Instruction::MoveUntil(n) => dynasm! { code
@@ -1376,6 +1390,10 @@ Instruction::MoveUntil(n) => dynasm! { code
     ; exit:
 },
 ```
+
+Here I again copied the code from `Move(i32)`, and also used dynasm's local
+labels, denoted by `:` and `<` or `>` depending on if the jump is backwards or
+forwards.
 
 And our [optimized JIT compiler is complete]! Measuring its performance:
 
@@ -1445,9 +1463,12 @@ original series by Eli Bendersky have [made use of LLVM], but I follow a more
 Rusty approach and use [Cranelift] instead. Cranelift is a code generator
 written in Rust, and used by projects such as [Wasmtime] and
 [rustc_codegen_cranelift]. It does not apply a lot of optimizations, so maybe we
-don't get it to our optimized JIT implementation (we will see). But it does
-solve the problem of multiple architecture targeting, so I will be able to run
-our compiler on my Android device, that uses ARM.
+don't get it be as fast as our optimized JIT implementation (we will see). But
+it does solve the problem of multiple architecture targeting, so I will at least
+be able to run our compiler on Android devices.
 
 [made use of LLVM]: https://eli.thegreenplace.net/2017/adventures-in-jit-compilation-part-3-llvm/
 [Cranelift]: https://github.com/bytecodealliance/wasmtime/tree/main/cranelift
+
+[Wasmtime]: https://github.com/bytecodealliance/wasmtime/
+[rustc_codegen_cranelift]: https://github.com/bjorn3/rustc_codegen_cranelift

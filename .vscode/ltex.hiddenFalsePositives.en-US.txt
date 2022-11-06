@@ -10,3 +10,10 @@
 {"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QIn the System V ABI, the stack need to be aligned by 16 bytes wherever we do a call^align.\\E$"}
 {"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QI didn't do it here because the program will finish immediately after running the code, so the OS will already free it anyway^fn_pointer_safety.\\E$"}
 {"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QPassing it through the Netwide Assembler, followed by objdump:\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\Q^could_be_better: Actually, this can already be improved by using conditional logic instead, as we will discover later when compiling this operation.\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QThis is a lesser problem for brainfuck operations with bigger implementations, like the \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q there, who has a very involved wrapping calculation (could be greatly improved by the memory length being a power of 2)^could_be_better, but the overhead is still very significant, almost 2x.\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\Q^could_be_better: Actually, this can already be greatly improved by using conditional logic instead, as we will discover later when compiling this operation.\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QPassing it through the Netwide Assembler, followed by objdump, and can get the machine code:\\E$"}
+{"rule":"IN_A_X_MANNER","sentence":"^\\QAnd on \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q, we pop the labels from the stack, and use them in a similar way:\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\Q^weird_name: The names of the registers in x64 are not very intuitive, due to backward compatibility.\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QHere is the quick reference that I am using to check the register names^weird_name and types.\\E$"}
