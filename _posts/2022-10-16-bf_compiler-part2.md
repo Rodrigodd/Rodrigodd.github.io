@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  "Compiling Brainfuck code - Part 2: A JIT Compiler"
+title:  "Compiling Brainfuck code - Part 2: A Singlepass JIT Compiler"
 date:   2022-10-22 12:00:00 -0300
 ---
 
@@ -393,7 +393,7 @@ will start with our basic interpreter, which will not have any of our applied
 optimizations, except for the precomputed paring brackets, that will be
 compiled down to conditional jumps.
 
-This interpreter will have single pass, which means that it will already emit
+This interpreter will have a single pass, which means that it will already emit
 the compiled code while still traversing the source code. In non-singlepass
 compilers, the source code may be entirely collected in a new intermediate
 representation, and then passed to the next pass.
@@ -1054,8 +1054,7 @@ b'[' => {
 }
 ```
 
-And on `]`, we pop the labels from the stack, and use them in
-a similar way:
+And on `]`, we pop the labels from the stack, and use them in a similar way:
 
 ```rust
 b']' => {
@@ -1255,12 +1254,13 @@ And now implementing A JIT compiled version of our optimized interpreter becomes
 very straightforward. For that I will just copy the `enum Instruction` and
 parsing code from the interpreter, and generate the machine from that. 
 
-This implementation will no longer be strictly speaking a single-pass
-implementation, because we are collection all instructions before doing the
-compilation. For this to remain as a single-pass implementation, we would need
-to emit and process `Instructions` one at a time. This can be done, but because
-some instructions are made up from smaller instruction (like `Clear`), this
-would be a little trick. So let's not focus on that.
+This implementation will no longer be, despite the title of this post, a
+strictly speaking single pass implementation, because we are collection all
+instructions before doing the compilation. For this to remain as a single-pass
+implementation, we would need to emit and process `Instructions` one at a time.
+This can be done, but because some instructions are made up from smaller
+instruction (like `Clear`), this would be a little trick. So let's not focus on
+that.
 
 [Here is the commit where I added the enum and parsing][enum_parsing]. I also clean up the
 unnecessary precomputation of paring bracket, that now happens in compilation.
