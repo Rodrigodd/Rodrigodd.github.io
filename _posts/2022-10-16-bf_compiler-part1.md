@@ -45,7 +45,7 @@ The instructions are the following:
 - `,`: Set the value at the pointer to the value read from stdin.
 - `[`: jump forward to the matching `]` if the value at the pointer is 0.
 - `]`: jump backward to the matching `[` if the value at the pointer is not 0.
-- any other symbol is treated as comment, and is ignored.
+- Any other symbol is treated as comment, and is ignored.
 
 For example, to print the numbers from 1 to 5, you can do:
 ```brainfuck
@@ -969,7 +969,7 @@ here][rust_overview].
 ![](/assets/brainfuck/plot6.svg "A decrease of 8.9% from the previous result"){:style="display:block; margin-left:auto; margin-right:auto"}
 
 From the first implementation to the last one we get a speedup of almost 7x.
-Of course we can always do better. We could continue implementing specific
+Of course, we can always do better. We could continue implementing specific
 instructions for common brainfuck operations, and we could do that on and on,
 without end (we could even make an instruction that prints the factors of a
 number!), but they would less and less generalize for all programs.
@@ -979,8 +979,8 @@ generated assembly for lost optimization opportunities, and modify the code to
 reach them, etc. We can also go `unsafe` and remove bound checks with
 `get_unchecked` and `unreachable_unchecked`[^did_that].
 
-[^did_that]: In fact, [I have did some of these changes here][micro], but
-    didn't carefully profiled it.
+[^did_that]: In fact, [I have done some of these changes here][micro], but
+    didn't carefully profile it.
 
 [micro]: https://github.com/Rodrigodd/bf-compiler/commit/b6591ebd367d89cceff166df09ca500c172d3873
 

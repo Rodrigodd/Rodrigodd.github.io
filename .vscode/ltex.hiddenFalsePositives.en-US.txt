@@ -12,3 +12,17 @@
 {"rule":"HAVE_PART_AGREEMENT","sentence":"^\\QWhen implementing the \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q instruction, I notice that x86 does not have add immediate for 64-bit values, so I downgrade all \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Qs used in instructions to \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q.\\E$"}
 {"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QCranelift is a code generator written in Rust, and used by projects such as Wasmtime and rustc_codegen_cranelift.\\E$"}
 {"rule":"IN_A_X_MANNER","sentence":"^\\QAnd on \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q, we pop the labels from the stack, and use them in a similar way:\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QThe current interpreter has run mandelbrot.bf in 91.6 seconds and factor.bf in 27.18 seconds^bench.\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\Q^bench: You can find all measures in detail, including method and environment, in this document.\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\Q^elis_bench: The implementation in the original blog post have taken, respectively, 64 seconds and 24 seconds on my machine.\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QSo our \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q enum becomes^instruction_size:\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\Q^instruction_size: Note that here I am using a \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q for the index of the pairing bracket, which have 8 bytes on a 64-bit system.\\E$"}
+{"rule":"WHITESPACE_RULE","sentence":"^\\Qmandelbrot.bf factor.bf\\E$"}
+{"rule":"COMMA_PARENTHESIS_WHITESPACE","sentence":"^\\Q+ 694 422\n- 591 370\n> 4,428 1,324\n< 4,363 1,294\n[ 686 231\n] 686 231\n.\\E$"}
+{"rule":"WHITESPACE_RULE","sentence":"^\\Qmandelbrot.bf factor.bf mandelbrot.bf factor.bf\\E$"}
+{"rule":"COMMA_PARENTHESIS_WHITESPACE","sentence":"^\\Q+ 179,053,599 212,428,900 351,460,869 396,481,127\n\\- 177,623,022 212,328,376 0 0\n\\> 4,453,036,023 1,220,387,724 1,408,648,727 484,719,480\n< 4,453,036,013 1,220,387,704 0 0\n\\[ 422,534,152 118,341,127 422,534,152 118,341,127\n\\] 835,818,921 242,695,606 835,818,921 242,695,606\n, 6,240 21 6,240 21\n, 0 10 0 10\n----- -------------- ------------- ------------- -------------\nTotal 10,521,107,970 3,226,569,468 3,018,468,909 1,242,237,371\\E$"}
+{"rule":"WHITESPACE_RULE","sentence":"^\\Qcount loop\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QIn Rust, the code AST is first converted to a High-Level Intermediate Representation (process called HIR lowering), which is used for type inference, trait solving and type checking.\\E$"}
+{"rule":"ENGLISH_WORD_REPEAT_BEGINNING_RULE","sentence":"^\\QWe can also go \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q and remove bound checks with \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q and \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q^did_that.\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\Q^did_that: In fact, I have done some of these changes here, but didn't carefully profile it.\\E$"}
+{"rule":"COMMA_PARENTHESIS_WHITESPACE","sentence":"^\\Q3 7\n, 0 1\\E$"}
