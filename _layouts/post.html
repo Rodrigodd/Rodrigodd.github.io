@@ -11,7 +11,8 @@ layout: default
         {{ page.date | date: date_format }}
       </time>
       {%- if page.modified_date -%}
-        ~ 
+    <span style="margin-left: 0.3em; margin-right: 0.3em"> • </span>
+        Updated 
         {%- assign mdate = page.modified_date | date_to_xmlschema -%}
         <time class="dt-modified" datetime="{{ mdate }}" itemprop="dateModified">
           {{ mdate | date: date_format }}
@@ -37,7 +38,7 @@ layout: default
       {% assign words_math = words_total | minus: words_without_math | times: 2.0 %}
       {% assign words = words_without_either | plus: words_code | plus: words_math | round %}
 
-      {% assign ert = words | divided_by:180 | at_least: 1 %}
+      {% assign ert = words | divided_by:250 | at_least: 1 %}
       {{ ert }} minute{% if ert != 1 %}s{% endif %} read
     </span>
 
