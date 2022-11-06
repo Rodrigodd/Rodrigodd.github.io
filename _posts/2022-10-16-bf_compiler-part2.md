@@ -4,21 +4,6 @@ title:  "Compiling Brainfuck code - Part 2: A JIT Compiler"
 date:   2022-10-22 12:00:00 -0300
 ---
 
-<span class="ert">
-    <abbr title="Estimated reading time">ERT</abbr>
-    {% assign words_total = page.content | replace: '<script type="math/tex">', '' | replace: '<script type="math/tex; mode=display">', '' | replace: '</script>', '' | strip_html | number_of_words %}
-    {% assign words_without_code = page.content | replace: '<pre class="highlight">', '<!--' | replace: '</pre>', '-->' | replace: '<script type="math/tex">', '' | replace: '<script type="math/tex; mode=display">', '' | replace: '</script>', '' | strip_html | number_of_words %}
-    {% assign words_without_math = page.content | strip_html | number_of_words %}
-    {% assign words_without_either = page.content | replace: '<pre class="highlight">', '<!--' | replace: '</pre>', '-->' | strip_html | number_of_words %}
-
-    {% assign words_code = words_total | minus: words_without_code | divided_by: 2.0 %}
-    {% assign words_math = words_total | minus: words_without_math | times: 2.0 %}
-    {% assign words = words_without_either | plus: words_code | plus: words_math | round %}
-
-    {% assign ert = words | divided_by:250 | at_least: 1 %}
-    {{ ert }} minute{% if ert != 1 %}s{% endif %}
-</span>
-
 This is the second post of a blog post series where I will reproduce [Eli
 Bendersky’s Adventures In JIT Compilation series][eli], but this time using the
 Rust.
