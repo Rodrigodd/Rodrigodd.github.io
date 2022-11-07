@@ -2,6 +2,7 @@
 layout: post
 title:  "Compiling Brainfuck code - Part 1: A Optimized Interpreter"
 date:   2022-10-21 15:00:00 -0300
+modified_date:   2022-11-07 15:00:00 -0300
 ---
 
 This is the first post of a blog post series where I will reproduce [Eli
@@ -349,7 +350,7 @@ factorization program][factor], by Brian Raiter, with the input 179424691.
 [mandel]: https://github.com/Rodrigodd/bf-compiler/blob/490179516e8c8e2f2d26f31c7bafd40e1faf65fa/programs/mandelbrot.bf
 [factor]: https://github.com/Rodrigodd/bf-compiler/blob/490179516e8c8e2f2d26f31c7bafd40e1faf65fa/programs/factor.bf
 
-The current interpreter has run mandelbrot.bf in 91.6 seconds and factor.bf in 27.18 seconds[^bench][^elis_bench].
+The current interpreter has run mandelbrot.bf in 96.1 seconds and factor.bf in 27.68 seconds[^bench][^elis_bench].
 
 [^bench]: You can find all measures in detail, including method and
     environment, [in this document][benchmark.adoc].
@@ -547,7 +548,7 @@ the byte index would be better), but this is good enough for our needs.
 
 Running the programs again:
 
-![](/assets/brainfuck/plot0.svg "A decrease of 24.6% from the previous result"){:style="display:block; margin-left:auto; margin-right:auto"}
+![](/assets/brainfuck/plot0.svg "A mean decrease of 26.63% from the previous result"){:style="display:block; margin-left:auto; margin-right:auto"}
 
 A decrease of 25%! But we can do better.
 
@@ -609,10 +610,10 @@ for b in source {
 ```
 Running it:
 
-![](/assets/brainfuck/plot1.svg "A decrease of 0.9% from the previous result"){:style="display:block; margin-left:auto; margin-right:auto"}
+![](/assets/brainfuck/plot1.svg "A mean decrease of 0.26% from the previous result"){:style="display:block; margin-left:auto; margin-right:auto"}
 
-Well... it was not a big reduction as I was expecting, only 0.9%. 0.9 ± 2.3 percent to
-be more precise. It is even uncertain that it really decreased.
+Well... it was not a big reduction as I was expecting, only 0.26%. 0.26 ± 0.37
+percent to be more precise. It is even uncertain that it really decreased.
 
 But let's do the same for the `Move` instructions:
 
@@ -662,9 +663,9 @@ for b in source {
 
 Running again:
 
-![](/assets/brainfuck/plot2.svg "A decrease of 73.3% from the previous result"){:style="display:block; margin-left:auto; margin-right:auto"}
+![](/assets/brainfuck/plot2.svg "A mean decrease of 71.3% from the previous result"){:style="display:block; margin-left:auto; margin-right:auto"}
 
-Wow! This is what I was looking for, almost 4 times in performance increase!
+Wow! This is what I was looking for, more than 3 times in performance increase!
 
 But now, there is the question? Why optimizing the increment/decrement results
 in such a small improvement, but optimizing the move instructions causes
@@ -833,9 +834,9 @@ b']' => {
 
 Running it:
 
-![](/assets/brainfuck/plot3.svg "A decreased of 5.5% from the previous result"){:style="display:block; margin-left:auto; margin-right:auto"}
+![](/assets/brainfuck/plot3.svg "A mean decreased of 4.5% from the previous result"){:style="display:block; margin-left:auto; margin-right:auto"}
 
-A decreased of 5.5% in execution time. And it decreased the total number of
+A mean decreased of 4.5% in execution time. And it decreased the total number of
 instructions by 0.80% and 4.59%, for `mandelbrot.bf` and `factor.bf`,
 respectively.
 
@@ -881,10 +882,10 @@ match instructions.as_slice() {
 }
 ```
 
-![](/assets/brainfuck/plot4.svg "A decrease of 8.9% from the previous result"){:style="display:block; margin-left:auto; margin-right:auto"}
+![](/assets/brainfuck/plot4.svg "A mean decrease of 15.3% from the previous result"){:style="display:block; margin-left:auto; margin-right:auto"}
 
-This one gives more substantial performance increase. A total decrease in
-run-time by 8.9%, and in instruction by 9.76% on mandelbrot and 31.4% on factor!
+This one gives more substantial performance increase. A mean decrease in
+run-time by 15.3%. Only 2.56% on mandelbrot, but 28.13% on factor!
 
 And finally the "move until 0" operator:
 
@@ -930,11 +931,10 @@ match instructions.as_slice() {
 }
 ```
 
-![](/assets/brainfuck/plot5.svg "A decrease of 14.7% from the previous result"){:style="display:block; margin-left:auto; margin-right:auto"}
+![](/assets/brainfuck/plot5.svg "A mean decrease of 11.2% from the previous result"){:style="display:block; margin-left:auto; margin-right:auto"}
 
 As expected from the previous profiles, this optimization has greater impact on
-the mandelbrot.bf. Instructions count goes down by 36.1% on mandelbrot and
-1.24% on factor! 14.7% decrease in total run-time.
+the mandelbrot.bf. Time goes down by 18.61% on mandelbrot and 3.79% on factor!
 
 # About Interpreters and Compilers
 

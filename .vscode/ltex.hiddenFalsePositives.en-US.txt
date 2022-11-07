@@ -26,3 +26,4 @@
 {"rule":"ENGLISH_WORD_REPEAT_BEGINNING_RULE","sentence":"^\\QWe can also go \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q and remove bound checks with \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q and \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Q^did_that.\\E$"}
 {"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\Q^did_that: In fact, I have done some of these changes here, but didn't carefully profile it.\\E$"}
 {"rule":"COMMA_PARENTHESIS_WHITESPACE","sentence":"^\\Q3 7\n, 0 1\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QThe current interpreter has run mandelbrot.bf in 96.1 seconds and factor.bf in 27.68 seconds^bench.\\E$"}
