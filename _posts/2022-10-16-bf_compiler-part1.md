@@ -365,7 +365,7 @@ The current interpreter has run mandelbrot.bf in 96.1 seconds and factor.bf in 2
 ## Optimizing our interpreter
 
 We can optimize our interpreter in multiple ways. That could be done by making
-some micro optimization to out interpreter code, like replacing indexing by raw
+some micro optimization to our interpreter code, like replacing indexing by raw
 pointers, looking up at generated assembly for optimization opportunities, etc.
 But before that, we have even greater optimization opportunities.
 
@@ -723,7 +723,7 @@ clears the original value), duplicating a cell (`[->>>+>+<<<<]`), etc.
 Many of these operations are basically loops with instructions inside. In this
 case, we can profile our programs by counting how many times a given loop is
 run, which boils down to counting how many times each particular `]` is
-executed. And them we present this data by deduplicating identical loops and
+executed. And then we present this data by deduplicating identical loops and
 displaying them in descendant order.
 
 Running [the new profiling][prof_loop] for `factor.bf`:

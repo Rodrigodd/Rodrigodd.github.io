@@ -22,7 +22,7 @@ title: Rodrigodd
 # email: rodrigobatsmoraes@hotmail.com
 description: ""
 baseurl: "" # the subpath of your site, e.g. /blog
-url: "hhtps://rodrigodd.github.io" # the base hostname & protocol for your site, e.g. http://example.com
+url: "https://rodrigodd.github.io" # the base hostname & protocol for your site, e.g. http://example.com
 github_username: Rodrigodd
 markdown: kramdown
 
