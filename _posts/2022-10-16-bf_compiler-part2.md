@@ -25,10 +25,10 @@ To grasp exactly how big is this overhead, we can take a look at generated
 assembly for the main loop of our interpreter, were the majority of the runtime
 is spent.
 
-In this case, I used [cargo-show-wasm] to get the x86 assembly for
+In this case, I used [cargo-show-asm] to get the x86 assembly for
 `Program::run`, and (after a lot clean up) I got the following:
 
-[cargo-show-wasm]: https://github.com/pacak/cargo-show-asm
+[cargo-show-asm]: https://github.com/pacak/cargo-show-asm
 
 ```nasm
 ; 'program: loop (not including first iteration)
