@@ -1129,7 +1129,9 @@ We can directly copy the code from our interpreter and put in a `extern
 
 But we need to adapt it to also return the IO error. Because Rust ABI is not
 stable, we cannot return the `Error` type directly. So instead I will put
-it in a Box, and return its pointer, using `Box::leak()`.
+it in a Box, and return its pointer, using [`Box::into_raw()`].
+
+[`Box::into_raw()`]: https://doc.rust-lang.org/std/boxed/struct.Box.html#method.into_raw
 
 Putting everything together, the read and write functions become:
 
@@ -1145,7 +1147,7 @@ extern "sysv64" fn write(value: u8) -> *mut std::io::Error {
     let result = stdout.write_all(&[value]).and_then(|_| stdout.flush());
 
     match result {
-        Err(err) => Box::leak(Box::new(err)) as *mut _,
+        Err(err) => Box::into_raw(Box::new(err)),
         _ => std::ptr::null_mut(),
     }
 }
@@ -1158,7 +1160,7 @@ unsafe extern "sysv64" fn read(buf: *mut u8) -> *mut std::io::Error {
 
         if let Err(err) = err {
             if err.kind() != std::io::ErrorKind::UnexpectedEof {
-                return Box::leak(Box::new(err));
+                return Box::into_raw(Box::new(err));
             }
             value = 0;
         }
