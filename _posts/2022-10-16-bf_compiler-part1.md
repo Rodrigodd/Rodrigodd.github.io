@@ -261,7 +261,7 @@ can encapsulate them in a struct.
 struct Program {
     program_counter: usize,
     pointer: usize,
-    instructions: Vec<Instructions>,
+    instructions: Vec<Instruction>,
     memory: [u8; 30_000]
 }
 ```
