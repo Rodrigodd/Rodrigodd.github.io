@@ -30,7 +30,7 @@ markdown: kramdown
 plugins:
   - jekyll-feed
   - jekyll-remote-theme
-remote_theme: jekyll/minima
+remote_theme: jekyll/minima@41b97699af658128fa9983e5312ca5516641f335
 
 minima:
   skin: auto
