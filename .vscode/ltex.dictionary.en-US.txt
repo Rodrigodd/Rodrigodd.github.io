@@ -27,3 +27,9 @@ mandelbrot
 deduplicating
 bytecode
 monomorphization
+cranelift
+CLIR
+falltrought
+miscompile
+remotion
+peekable
