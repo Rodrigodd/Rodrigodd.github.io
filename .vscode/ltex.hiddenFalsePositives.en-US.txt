@@ -27,3 +27,12 @@
 {"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\Q^did_that: In fact, I have done some of these changes here, but didn't carefully profile it.\\E$"}
 {"rule":"COMMA_PARENTHESIS_WHITESPACE","sentence":"^\\Q3 7\n, 0 1\\E$"}
 {"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QThe current interpreter has run mandelbrot.bf in 96.1 seconds and factor.bf in 27.68 seconds^bench.\\E$"}
+{"rule":"TYPO_FORM_FROM","sentence":"^\\QCranelift's IR, similar to many others code generators IR, uses static single-assignment form (SSA), which basically means that there is no mutable variables in this representation.\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\Qthe first part: {% post_url 2022-10-16-bf_compiler-part1 %}\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QInstead of waiting for the compilation every time we need to run a program, we can instead compile it just one, ahead-of-time (AOT)^aot, and serialize it to disk.\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\Q^aot: I used the term \"AOT\" here to have a contrast with \"JIT\", but it is a term more used in context where the language is expected to be JIT compiled.\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QThe previous part is here({% post_url 2022-10-16-bf_compiler-part2 %}), where we made an x86 JIT compiler for brainfuck interpreter.\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QTODO:\nTell that my measures also take in the compilation time.\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\Q^seal: Sealing them as soon as possible allows the resolving of \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Qs to be faster.\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QWe must also remember to seal our block as soon as all branches to it are defined^seal.\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QTo solve this, we can instead make an AOT compiler^aot.\\E$"}

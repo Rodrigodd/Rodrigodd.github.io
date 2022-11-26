@@ -4,11 +4,6 @@ title:  "Compiling Brainfuck code - Part 3: A Cranelift JIT Compiler"
 date:   2022-11-21 8:00:00 -0300
 ---
 
-TODO:
-    - On the example, show that multiples add_imm 1, are replaced by a single
-      one, and be surprised later that it didn't work when compiling brainfuck.
-    - Tell that my measures also take in the compilation time.
-
 This is the third post of a blog post series where I will reproduce [Eli
 Bendersky’s Adventures In JIT Compilation series][eli], but this time using the
 [Rust programming language][rust].
@@ -18,25 +13,24 @@ Bendersky’s Adventures In JIT Compilation series][eli], but this time using th
 
 The [previous part is here]({% post_url 2022-10-16-bf_compiler-part2 %}), where
 we made an x86 JIT compiler for brainfuck interpreter. In this part we will make
-a JIT compiler using the cranelift machine code generator.
+a JIT compiler using the Cranelift machine code generator.
 
 # What is Cranelift
 
 [Cranelift] is a machine code generator written in Rust, similar to tools like
-LLVM or GCC's backend. As briefly discussed at the end of the [last part], these
-tools are used to crate an abstraction layer, by a target-independent
-intermediate representation (IR), between language implementations and their
-compilation targets. 
+LLVM or GCC's backend. As briefly discussed at the end of the last part, these
+tools are used to crate an abstraction layer between language implementations
+and their compilation targets, by means of a target-independent intermediate
+representation (IR).
 
-This means that instead of each language compiler having a backend for
-each compilation target (a quadratic amount of work), each language compiler
-can instead target the code generator IR, and the code generator has a backend
-for each compilation target (a linear amount of work).
+This means that instead of each language having a compiler for each target (a
+quadratic amount of work), each language compiler can instead target the code
+generator IR, and the code generator has a backend for each compilation target
+(a linear amount of work).
 
 Furthermore, these tools also take to job of applying all kinds of optimizations
-to the generated, since it allows the generated code to be optimal for each
-target, and because it can also improve the performance of dozens of language at
-once.
+to the generated machine code, since it allows it to be optimal for each target,
+and also because it improves the performance of dozens of language at once.
 
 But Cranelift has focus on fast compile-time with reasonable runtime
 performance, and it is also not so mature, so it does not produce heavily
@@ -48,8 +42,8 @@ on static compilation, where programs are compiled once and run many times.
 # Basics of Cranelift IR
 
 Using Cranelift boils down to translation our code to Cranelift's IR (CLIR),
-that later get optimized and finally compiled down to machine code. In the
-examples below I am showing the CLIR in its textual format, but it is more often
+that later get optimized and compiled down to machine code. In the examples
+below I am showing the CLIR in its textual format, but it is more often
 manipulated in its in-memory data structure format, as we will see in the next
 section.
 
@@ -79,8 +73,8 @@ v7 = iadd v5, v6 // now x is in v7
 
 These instructions are contained in basic blocks. A [basic block] is sequence of
 instructions, with a single entry at the top, and no branches except at the very
-end. Branches can only target other blocks. In Cranelift, in particular, the
-blocks can receive arguments.
+end. Branches can only target other blocks. In Cranelift the blocks can receive
+arguments that allow passing values between blocks.
 
 [basic block]: https://en.wikipedia.org/wiki/Basic_block
 
@@ -108,11 +102,13 @@ block3(v3):
 A set of basic blocks forms a function, which is the compilation unit of
 Cranelift. A function has a start block, which inherit the function parameters.
 
+But let's now see how these are generated in practice.
+
 # A Simple Example
 
 Let's try compiling the same example that we use in the previous part, the add 1
-function. It receives one parameter, adds 1 to it, and return it. In x86
-assembly, it was only three instructions:
+function. It receives one parameter, adds 1, and return it. In x86 assembly, it
+was only three instructions:
 
 ```nasm
 add rdi, 1    ; the argument is in rdi, I add 1 to it.
@@ -130,14 +126,14 @@ block0(v0: i64):
 }
 ```
 
-For that we need to make use of the [cranelift] crate. That crate is only a
-umbrella for two other crates, [cranelift-codegen], the core of cranelift, that
-actually compiles CLIR to machine code, and [cranelift-frontend], that is used
-to write the CLIR.
+For that we need to make use of the [cranelift] crate. That crate is an umbrella
+for two other crates, [cranelift-codegen], the core of Cranelift that actually
+compiles CLIR to machine code, and [cranelift-frontend], that is used to write
+the CLIR.
 
-[cranelift]: https://docs.rs/cranelift
-[cranelift-codegen]: https://docs.rs/cranelift-codegen
-[cranelift-frontend]: https://docs.rs/cranelift-frontend
+[cranelift]: https://docs.rs/cranelift/0.89.2/cranelift/index.html
+[cranelift-codegen]: https://docs.rs/cranelift-codegen/0.89.2/cranelift_codegen/index.html
+[cranelift-frontend]: https://docs.rs/cranelift-frontend/0.89.2/cranelift_frontend/index.html
 
 First we create a [`Function`], that will contain all our CLIR. For that we need
 to give it a name (for debugging purposes only), and a signature. Its signature
@@ -163,6 +159,10 @@ create a [`FunctionBuilderContext`], that is used to recycle resources between
 the compilation of multiple functions (something we won't do). Then we pass both
 the `Function` and the `FunctionBuilderContext` to `FunctionBuilder`:
 
+[`Function`]: https://docs.rs/cranelift-codegen/0.89.2/cranelift_codegen/ir/function/struct.Function.html
+[`FunctionBuilder`]: https://docs.rs/cranelift-frontend/0.89.2/cranelift_frontend/struct.FunctionBuilder.html
+[`FunctionBuilderContext`]: https://docs.rs/cranelift-frontend/0.89.2/cranelift_frontend/struct.FunctionBuilderContext.html
+
 ```rust
 use cranelift::frontend::{FunctionBuilder, FunctionBuilderContext};
 
@@ -171,12 +171,16 @@ let mut builder = FunctionBuilder::new(&mut func, &mut func_ctx);
 ```
 
 Now we can start the translation! First we create a basic block, that will be
-the entry of our function. So, we must append the parameters of our function to
-the block, and switch to it, allowing us to start writing instruction to it.
+the entry of our function. We append the parameters of our function to the
+block, and switch to it, allowing us to start writing instruction.
 
 We must also remember to seal our block as soon as all branches to it are
-defined. This allows the translation process to be faster. Because our function
-have no branches we can seal it right after creating it.
+defined[^seal]. Because our function have no branches we can seal it right after
+creating it.
+
+[^seal]: Sealing them as soon as possible allows the resolving of `Variable`s to
+    be faster. I present and use `Variable`s when we start making our brainfuck
+    compiler.
 
 ```rust
 let block = builder.create_block();
@@ -188,7 +192,7 @@ builder.switch_to_block(block);
 
 Now we can start writing instructions. We grab the value of the first (and only)
 parameter of the block, add 1 to it, and return it. And then we can finalize our
-function!
+function.
 
 ```rust
 let arg = builder.block_params(block)[0];
@@ -198,7 +202,7 @@ builder.ins().return_(&[plus_one]);
 builder.finalize();
 ```
 
-With this our function is complete. If we want to debug what we have generated,
+With this our function is complete! If we want to debug what we have generated,
 we can print the CLIR:
 
 ```rust
@@ -213,20 +217,24 @@ block0(v0: i64):
 }
 ```
 
-It is exactly what I have showed at the start of the section (I have copied
-pasted it there).
+It is exactly what I have showed at the start of the section (I have copy-pasted
+it there).
 
 Now we only need to compile it. For that we will need to use [`Context`], that
 contains everything to compile our function.
 
 First we need to get a [`TargetISA`], that represents the target that we went to
-compile to. We get one by passing a `Triple` from the `target_lexicon` crate to
-`isa::lookup`. We will use `Tiple::host()` to get the native ISA of our host
-(because we will run on it right after). In my case (and most cases) this is an
-x86-64 target.
+compile to. We get one by passing a [`Triple`] from the [`target_lexicon`] crate
+to `isa::lookup`. We will use `Tiple::host()` to get the native ISA of our host
+(because we will run on it right after). In out case this is an x86-64 target.
+
+[`Context`]: https://docs.rs/cranelift-codegen/0.89.2/cranelift_codegen/struct.Context.html
+[`TargetISA`]: https://docs.rs/cranelift-codegen/0.89.2/cranelift_codegen/isa/trait.TargetIsa.html
+[`target_lexicon`]: https://docs.rs/target-lexicon/0.12.5/target_lexicon/index.html
+[`Triple`]: https://docs.rs/target-lexicon/0.12.5/target_lexicon/struct.Triple.html
 
 The `TargetISA` also receives a `settings::Flags`, that contains some
-compilations settings like level of optimizations.
+compilations settings, like the level of optimization.
 
 ```rust
 use cranelift::codegen::{isa, settings};
@@ -252,8 +260,11 @@ This returns a [`CompileCode`] struct, the machine code can be retrieved with
 the `code_buffer` method.
 
 Now to run it, we can do the same process as we have done in the last part.
-But instead of using raw `libc` calls, lets use [`memmap2`] safe and
+But instead of using raw `libc` calls, lets use [`memmap2`]'s safe and
 cross-platform abstractions instead:
+
+[`CompileCode`]: https://docs.rs/cranelift-codegen/0.89.2/cranelift_codegen/type.CompiledCode.html
+[`memmap2`]: https://docs.rs/memmap2/0.5.8/memmap2/index.html
 
 ```rust
 let mut buffer = memmap2::MmapOptions::new()
@@ -277,9 +288,9 @@ println!("out: {}", x);
 
 And if we run the code it prints 2! It works!
 
-But is the generated code good? Let's take a look at its generated code. You can
-use `ctx.set_disasm(true)` and `code.disasm` to get a disassemlby generated by
-Cranelift, which contains some extra debug information. But it it use AT&T
+But is the generated code any good? Let's take a look at it. You can use
+`ctx.set_disasm(true)` and `code.disasm` to get a disassembly generated by
+Cranelift, which also contains some extra debug information. But it uses AT&T
 syntax, and in this series I am using Intel syntax, so I will save the code to a
 file and disassemble it with objdump:
 
@@ -305,15 +316,15 @@ Disassembly of section .data:
    f:   c3                      ret
 ```
 
-Was we can see, if you ignore the pushes and moves use for setting up the stack
+As we can see, if you ignore the pushes and moves use for setting up the stack
 frame, it generated machine code pretty close to what we have done before.
 
 It is cool that Cranelift also takes care of generating the code for setting up
 the stack frame, but it is not so necessary for leaf functions like this, even
 more for such small function.
 
-Well actually, Cranelift is supposed to do that (see [issue #1148]), but this is
-currently not implemented for x86. But it appears to be implemented for
+And in fact, Cranelift is supposed to do that, but this is currently not
+implemented for x86 (see [issue #1148]). But it appears to be implemented for
 AArch64...
 
 [issue #1148]: https://github.com/bytecodealliance/wasmtime/issues/1148
@@ -356,15 +367,55 @@ Disassembly of section .data:
 
 And look! Only two instructions, no useless stack frame allocation!
 
+
+Another thing we can look at is what happens when non-optimal code is emitted,
+for example, if I add 1 two times, one after the other, as we will do in the
+brainfuck compiler. Could Cranelift be able to optimized it to a single add?
+
+First, let's enable Cranelift optimizations. For this, we need to use the
+`settings::builder()`, that was used for creating the compiler flags:
+
+```rust
+let mut builder = settings::builder();
+builder.set("opt_level", "speed").unwrap();
+let flags = settings::Flags::new(builder);
+```
+
+Now we can emit some non-optimal code:
+
+```rust
+let arg = builder.block_params(block)[0];
+let plus_one = builder.ins().iadd_imm(arg, 1);
+let plus_two = builder.ins().iadd_imm(plus_one, 1);
+builder.ins().return_(&[plus_two]);
+```
+
+And if we run again and disassemble:
+
+```shell
+$ objdump -b binary -D -M intel,x86-64 -m i386:x86-64 dump.bin
+
+0000000000000000 <.data>:
+   0:   55                      push   rbp
+   1:   48 89 e5                mov    rbp,rsp
+   4:   48 89 f8                mov    rax,rdi
+   7:   83 c0 02                add    eax,0x2
+   a:   48 89 ec                mov    rsp,rbp
+   d:   5d                      pop    rbp
+   e:   c3                      ret
+```
+
+Hey, look! A single `add eax, 2`. It automatically optimized the code for us!
+
 # A Cranelift Compiler
 
-Now we can finally start compiling brainfuck. But we need first to take care of
+Now we can finally start compiling brainfuck. But first we need to take care of
 some details.
 
-First, the SSA don't mutable values, but brainfuck has a mutable variable, the
-cell pointer (the mutability of the memory itself is represented by load/store
-instructions). So we would need to somehow keep track of what value is the
-current value of pointer, and keeping passing it between blocks.
+First, the SSA don't have mutable values, but brainfuck has a mutable variable,
+the cell pointer (the mutability of the memory itself will be represented by
+load/store instructions). So we would need to somehow keep track of what value
+is the current value of pointer, and keeping passing it between blocks.
 
 But thankfully, `codegen-frontend` already have a functionality that
 automatically manages variables. We only need to create a `Variable`, and
@@ -372,10 +423,11 @@ declared inside our `builder`. Whenever we need its value, we call
 `builder.use_var`, and when we need to set it we call `builder.def_var`.
 
 And second, we were using `I64` as the type of our values in the last example,
-but for the pointer it should have the pointer type of our current target ISA.
-We can get it by calling `isa.pointer_type()`.
+but for the pointer it should have the pointer type of our current target ISA
+(as we may change the compilation target later). We can get it by calling
+`isa.pointer_type()`.
 
-So we can start writing our compiler:
+With all this together, we can start writing our compiler:
 
 ```rust
 struct Program {
@@ -384,7 +436,8 @@ struct Program {
 }
 impl Program {
     fn new(source: &[u8]) -> Result<Program, UnbalancedBrackets> {
-        let builder = settings::builder();
+        let mut builder = settings::builder();
+        builder.set("opt_level", "speed").unwrap();
         let flags = settings::Flags::new(builder);
 
         let isa = match isa::lookup(Triple::host()) {
@@ -392,9 +445,10 @@ impl Program {
             Ok(isa_builder) => isa_builder.finish(flags).unwrap(),
         };
 
+        // we get the `pointer_type` from `isa`
         let pointer_type = isa.pointer_type();
 
-        // get memory address as parameter, and return pointer to io::Error
+        // receive memory address as parameter, and return pointer to io::Error
         let mut sig = Signature::new(CallConv::SystemV);
         sig.params.push(AbiParam::new(pointer_type));
         sig.returns.push(AbiParam::new(pointer_type));
@@ -416,7 +470,7 @@ impl Program {
 
         let memory_address = builder.block_params(block)[0];
 
-        // initialize it to 0 
+        // initialize pointer to 0 
         let zero = builder.ins().iconst(pointer_type, 0);
         builder.def_var(pointer, zero);
 
@@ -470,9 +524,9 @@ impl Program {
 
 Now we only need to implement each instruction.
 
-Whenever we need to read the value of the current cell, we add the memory_adress
-with the value of pointer, and use `load.i8` to get its value. To write it back,
-we use `store.i8`.
+Whenever we need to read the value of the current cell, we will add
+`memory_address` with the value of `pointer` to get the cell address, and use
+`load.i8` to read it. To write it back, we use `store.i8`.
 
 These instructions need a `MemFlags`, which is used to tell if the memory may
 trap, if it is aligned, etc. Let's use the default for now:
@@ -525,7 +579,7 @@ b'>' => {
 ```
 
 Now for `[` and `]` we need to start creating blocks. So when we reach a `[` we
-create two blocks, on for the inside of the brackets, and another for after it.
+create two blocks, one for the inside of the brackets, and another for after it.
 We conditionally jump to one of the blocks based on the current cell value,
 using a `brz`/`jump` pair of instructions. We switch to the inner block (next
 instructions will be written to it), and we finish by pushing the blocks to the
@@ -605,14 +659,14 @@ let (read_sig, read_address) = {
 };
 ```
 
-And in case of an error we also need a block to branch to:
+We also need a block to branch to in case of an error:
 
 ```rust
 let exit_block = builder.create_block();
 builder.append_block_param(exit_block, pointer_type);
 ```
 
-Right calling `builder.finalize()`:
+And right after calling `builder.finalize()`:
 
 ```rust
 builder.switch_to_block(exit_block);
@@ -664,10 +718,10 @@ b',' => {
 
 And done! If we run it:
 
-[Bench goes here]
+![](/assets/brainfuck/plot12.svg){:style="display:block; margin-left:auto; margin-right:auto"}
 
-14.26s, about 2% faster than our single-pass implementation... Well, it is
-faster, but I was hoping that it would have at least a big improvement by
+14s, about 4% faster than our single-pass implementation. It is definitely
+faster, but, well, I was hoping that it would have a bigger improvement by
 replacing all repeat instructions by a single one.
 
 Let's take a look at its generated code. Here is the code generated by the
@@ -701,17 +755,26 @@ Disassembly of section .data:
   28:   c3                      ret
 ```
 
-As we can see, Cranelift was not capable of removing the stores, but have
-removed the loads. If you look around on Cranelift's GitHub repo, you will find
-[this issue] that explains what happened here. The remotion of redundant loads is
-implemented, but for store it is not.
+As we can see, contrary to what I expected, Cranelift was not capable of merging
+all sums together when they are between a load and a store.
 
-So, I make [a naive implementation of redundant load remotion here][hackchanges]
-(probably miscompile some code). Only removing the stores was not enough,
-because this optimization was the last pass, so I naively rerun all previous
-optimizations passes that looked important, and I get that:
+But looking more closely, it was able to remove the redundant loads
+(`movzx rdx,BYTE PTR [rdi]`), but not the stores (`mov BYTE PTR [rdi],dl`).
 
+Looking around on Cranelift's GitHub repo, you will find [this issue] that
+explains what happened here: the remotion of redundant loads is implemented, but
+for store it is not.
+
+So, I made [a naive implementation of redundant load remotion here][hackchanges]
+(this probably miscompile some code). Only removing the stores was not enough,
+because the optimization pass that merge multiple `add`s together happened in a
+previous pass, so my change also naively rerun all optimizations passes that
+looked important.
+
+[this issue]: https://github.com/bytecodealliance/wasmtime/issues/4167
 [hackchanges]: https://github.com/Rodrigodd/wasmtime/compare/b077854b57b3aa25295e37ad55a21300e7768c7c..2b960dec5b67f0348ab178121a6c5fd7feae3cdc
+
+I got the following emitted code:
 
 ```shell
 $ objdump -b binary -D -M intel,x86-64 -m i386:x86-64 dump.bin
@@ -733,19 +796,18 @@ Disassembly of section .data:
   14:   c3                      ret
 ```
 
-Much better! Running again:
+Much better! But running again shows that does not give much improvement (I
+forget to benchmark this change, sorry for the lack of precise timings).
 
-[Bench goes here]
 
-14.23s, not much improvement. Actually this is expected, because an actual
-improvement only comes from optimizing the `<` and `>` instructions, was we
-have seen in [the first part]. And that one if much more trick to optimize
-automatically:
+Actually, this was to be expected, because an actual improvement only comes from
+optimizing the `<` and `>` instructions, was we have seen in [the first part].
+And that one if much more trick to optimize automatically:
 
 [the first part]: {% post_url 2022-10-16-bf_compiler-part1 %}
 
 ```shell
-# this ones is for `>>>+`
+# this ones is for the program `>>>+`
 $ objdump -b binary -D -M intel,x86-64 -m i386:x86-64 dump.bin
 
 dump.bin:     file format binary
@@ -781,15 +843,15 @@ Disassembly of section .data:
   61:   c3                      ret
 ```
 
-Here it is less obvious how a program could detect that these tree `cmovae` can be
-replaced by a single one.
+Here it is less obvious how a program could detect that these three `cmovae` can
+be replaced by a single one.
 
 But to be fair, Cranelift is design to have faster compilation times, and may
 not be prepared to optimized such a bad emitted IR.
 
-So let's optmized these repeated operations during translation. I will not
-implement the three remaining optimizations, beacause I think they will not be
-necessary.
+So let's optimize these repeated operations during translation. I will not
+implement the three remaining optimizations yet, because I think they will not
+be necessary.
 
 First let's make the source iterator be peekable, and filter out non-instruction 
 symbols:
@@ -854,18 +916,18 @@ b'<' | b'>' => {
 
 Running it again:
 
-[Bench goes here]
+![](/assets/brainfuck/plot13.svg){:style="display:block; margin-left:auto; margin-right:auto"}
 
 Much faster! But it is still slower than our optimized compiler.
 
-So I gave up on the idea that Cranelift, in its current form, could apply
-enough optimizations to replace our optimizations.
+So I gave up on the idea that, currently, Cranelift could apply enough
+optimizations to replace our optimizations.
 
-[Here is the implementation for the optimized instruction][full code]. The
+So, [here is the implementation for the optimized instructions][full code]. The
 `MoveUntil` instructions was not included, because I noticed that it does not
 help in generating better optimized code:
 
-[full code]: TODO
+[full code]: https://github.com/Rodrigodd/bf-compiler/commit/eaf72a511e29d1ff611b7b8af0f702199020e7a7
 
 ```rust
 Instruction::Clear => {
@@ -905,20 +967,25 @@ Instruction::AddTo(n) => {
 
 And the results:
 
-[Bench goes here]
+![](/assets/brainfuck/plot14.svg){:style="display:block; margin-left:auto; margin-right:auto"}
 
 Now it is faster that our previous implementation! At least, we got something
 from using Cranelift.
 
+It is also important to notice that the times that I measure here takes in
+account the running time of the entire program, including the compilation time.
+Mandelbrot takes at least 100ms to compile, and factor 30 ms, which are already
+significant times.
+
 But of course, optimizations is only one the strengths of using a machine code
 generator. Because now our compiler can target 3 different architectures! We
-have x86-64, AArch64, s390x and also however backend they add in the future.
+have x86-64, AArch64, s390x and however backend they add in the future!
 
 [After changing ABI's of the functions to the host default][change_ABI] (we
 don't need to stick to a single calling convention anymore), I was finally able
 to run our compiler on my smartphone (an AArch64):
 
-[change_ABI]: TODO
+[change_ABI]: https://github.com/Rodrigodd/bf-compiler/commit/ece3bac8d4f0862eac81f8c4b5821ea01ee4fd99
 
 ![](/assets/brainfuck/Screenshot_20221118-193503_Termux.png){:style="display:block; margin-left:auto; margin-right:auto"}
 
@@ -927,9 +994,9 @@ Cool!
 # Conclusion
 
 At the start of this post I have no idea of how good Cranelift optimizations
-were. Ideally it would be able to automatically figure out all the
-optimizations that we came up in the first part. At the other end, this would
-emit suboptimal machine code, and be slower than our handcrafted implementation.
+were. Ideally it would be able to automatically figure out all the optimizations
+that we came up in the first part. At the other end, it would emit suboptimal
+machine code, and be slower than our handcrafted implementation.
 
 In the end, we verified that the second scenario didn't occur, the generated
 code was actually faster than our implementation.
@@ -939,12 +1006,12 @@ multiple `+` didn't happen by default (at least I was able to implement it in
 Cranelift fairly easy, despite being hackish).
 
 Yet, it accomplished our main goal of using a machine code generator: be able to
-target multiple architecture with only a fraction with the knowledge and work
+target multiple architectures with only a fraction of the knowledge and work
 required.
 
-Note that this post is not showing that Cranelift optimizations are bad.
-Actually this shows how bad brainfuck is, as it only have a single persistent
-variable and almost every instruction need to read from and write to memory.
+Note that this post is not showing that Cranelift optimizations are bad, but how
+bad brainfuck is. Brainfuck only has a single persistent variable and almost
+every instruction need to read and write to memory.
 
 This means that many of Cranelift optimizations passes are completely
 underexplored, because they are designed for languages that have multiples
@@ -953,24 +1020,26 @@ for most programming languages.
 
 # Future work
 
-[Bench goes here]
+![](/assets/brainfuck/plot15.svg){:style="display:block; margin-left:auto; margin-right:auto"}
 
-Since the beginning of this series we are optimizing our brainfuck implementation
-more and more. In fact, we could continue expending more and more time applying
-optimizations to our interpreter, ad infinitum.
+Since the beginning of this series we are optimizing our brainfuck
+implementation more and more. In fact, we could continue creating more and more
+optimizations to our program, making the execution of out brainfuck programs be
+faster and faster.
 
 But as we go applying these optimizations, the time necessary to parse and
 compile the code starts to become greater and greater. To such a point, that
-applying more optimizations will not actually decrease the time to run a
-brainfuck program.
+applying more optimizations will not actually decrease the time we need to
+wait to get a brainfuck program to run.
 
 At that point, having such a degree of optimizations is not viable when creating
 a JIT compiler.
 
-To solve this, we can instead make an AOT compiler. Instead of waiting for the
-compilation every time we need to run a program, and can instead compile it just
-one, ahead-of-time (AOT)[^aot], and serialize it to disk. Now, the user can run the
-program many times as they want, without needing to wait for the compilation.
+To solve this, we can instead make an AOT compiler[^aot]. Instead of waiting for
+the compilation every time we need to run a program, we can instead compile it
+just one, ahead-of-time (AOT), and serialize it to disk. Now, the user can load
+and run the program as many times as they want, without needing to wait for the
+compilation.
 
 [^aot]: I used the term "AOT" here to have a contrast with "JIT", but it is a
     term more used in context where the language is expected to be JIT compiled.
@@ -980,5 +1049,5 @@ program many times as they want, without needing to wait for the compilation.
     may be better suitable to "compiled languages" than "AOT compiled".
 
 And this is exactly what we will do in the next part. We will see how we can
-get our generated machine code and serialize it to an executable file, like one
-in the ELF format.
+get our generated machine code and serialize it to an executable file, like a
+ELF file.
