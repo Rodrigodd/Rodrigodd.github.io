@@ -30,12 +30,12 @@ markdown: kramdown
 plugins:
   - jekyll-feed
   - jekyll-remote-theme
-remote_theme: jekyll/minima@41b97699af658128fa9983e5312ca5516641f335
+remote_theme: jekyll/minima@1e6da7df8e42e56f4506d78137b778bff36b2993
 
 minima:
   skin: auto
   social_links:
-    github: Rodrigodd
+    - { platform: github, user_url: https://github.com/Rodrigodd/Rodrigodd.github.io }
 
 # Exclude from processing.
 # The following items will not be processed, by default.
