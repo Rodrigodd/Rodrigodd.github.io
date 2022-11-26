@@ -11,9 +11,14 @@ Bendersky’s Adventures In JIT Compilation series][eli], but this time using th
 [eli]: https://eli.thegreenplace.net/2017/adventures-in-jit-compilation-part-1-an-interpreter
 [Rust]: https://www.rust-lang.org
 
-The [previous part is here]({% post_url 2022-10-16-bf_compiler-part1 %}), where
-we made an optimized brainfuck interpreter. In this part we will make a
-brainfuck JIT compiler.
+- [Part 1: An Optimized Interpreter]({% post_url 2022-10-16-bf_compiler-part1 %})
+- **Part 2: A Singlepass JIT Compiler**
+- [Part 3: A Cranelift JIT Compiler]({% post_url 2022-11-21-bf_compiler-part3 %})
+- Part 4: A Static Compiler (WIP)
+
+In the [previous part]({% post_url 2022-10-16-bf_compiler-part1 %}) we made an
+optimized brainfuck interpreter. In this part we will make a brainfuck JIT
+compiler.
 
 # The Interpreter Overhead
 
