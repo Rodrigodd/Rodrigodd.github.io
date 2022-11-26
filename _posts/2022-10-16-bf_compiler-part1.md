@@ -10,6 +10,11 @@ Bendersky’s Adventures In JIT Compilation series][eli], but this time using th
 [Rust programming language][rust]. I will also expand this series into
 compiling native executables.
 
+- **Part 1: An Optimized Interpreter**
+- [Part 2: A Singlepass JIT Compiler]({% post_url 2022-10-16-bf_compiler-part2 %})
+- [Part 3: A Cranelift JIT Compiler]({% post_url 2022-11-21-bf_compiler-part3 %})
+- Part 4: A Static Compiler (WIP)
+
 The goal of this series is to give a small intro into writing compilers, and
 explore the tools in the Rust ecosystem that can be used for that.
 

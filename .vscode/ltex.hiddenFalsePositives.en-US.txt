@@ -36,3 +36,8 @@
 {"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\Q^seal: Sealing them as soon as possible allows the resolving of \\E(?:Dummy|Ina|Jimmy-)[0-9]+\\Qs to be faster.\\E$"}
 {"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QWe must also remember to seal our block as soon as all branches to it are defined^seal.\\E$"}
 {"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QTo solve this, we can instead make an AOT compiler^aot.\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QPart 1: An Optimized Interpreter({% post_url 2022-10-16-bf_compiler-part1 %})\nPart 2: A Singlepass JIT Compiler({% post_url 2022-10-16-bf_compiler-part2 %})\nPart 3: A Cranelift JIT Compiler\nPart 4: A Static Compiler (WIP)\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QIn the previous part({% post_url 2022-10-16-bf_compiler-part2 %}) we made an x86 JIT compiler for brainfuck interpreter.\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QPart 1: An Optimized Interpreter({% post_url 2022-10-16-bf_compiler-part1 %})\nPart 2: A Singlepass JIT Compiler\nPart 3: A Cranelift JIT Compiler({% post_url 2022-11-21-bf_compiler-part3 %})\nPart 4: A Static Compiler (WIP)\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QIn the previous part({% post_url 2022-10-16-bf_compiler-part1 %}) we made an optimized brainfuck interpreter.\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QPart 1: An Optimized Interpreter\nPart 2: A Singlepass JIT Compiler({% post_url 2022-10-16-bf_compiler-part2 %})\nPart 3: A Cranelift JIT Compiler({% post_url 2022-11-21-bf_compiler-part3 %})\nPart 4: A Static Compiler (WIP)\\E$"}

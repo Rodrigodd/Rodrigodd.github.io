@@ -11,9 +11,14 @@ Bendersky’s Adventures In JIT Compilation series][eli], but this time using th
 [eli]: https://eli.thegreenplace.net/2017/adventures-in-jit-compilation-part-1-an-interpreter
 [Rust]: https://www.rust-lang.org
 
-The [previous part is here]({% post_url 2022-10-16-bf_compiler-part2 %}), where
-we made an x86 JIT compiler for brainfuck interpreter. In this part we will make
-a JIT compiler using the Cranelift machine code generator.
+- [Part 1: An Optimized Interpreter]({% post_url 2022-10-16-bf_compiler-part1 %})
+- [Part 2: A Singlepass JIT Compiler]({% post_url 2022-10-16-bf_compiler-part2 %})
+- **Part 3: A Cranelift JIT Compiler**
+- Part 4: A Static Compiler (WIP)
+
+In the [previous part]({% post_url 2022-10-16-bf_compiler-part2 %}) we made an
+x86 JIT compiler for brainfuck interpreter. In this part we will make a JIT
+compiler using the Cranelift machine code generator.
 
 # What is Cranelift
 
