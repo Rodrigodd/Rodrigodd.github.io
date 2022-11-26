@@ -33,3 +33,7 @@ falltrought
 miscompile
 remotion
 peekable
+accessor
+wasm
+cranelift-codegen
+cranelift-frontend
