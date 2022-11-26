@@ -988,7 +988,8 @@ have x86-64, AArch64, s390x and however backend they add in the future!
 
 [After changing ABI's of the functions to the host default][change_ABI] (we
 don't need to stick to a single calling convention anymore), I was finally able
-to run our compiler on my smartphone (an AArch64):
+to run our compiler on my smartphone (an AArch64), using
+[Termux](https://termux.dev/):
 
 [change_ABI]: https://github.com/Rodrigodd/bf-compiler/commit/ece3bac8d4f0862eac81f8c4b5821ea01ee4fd99
 
