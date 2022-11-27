@@ -87,7 +87,7 @@ To implement an if-else expression for example, you would need at least four
 blocks, the start block, an if block, an else block and the after block:
 
 ```clif
-// x = if v0 > 0 { 1 } else { 2 }
+// x = if v0 != 0 { 1 } else { 2 }
 block0(v0: i32):
     brnz v0, block1 // branch if not zero
     jump block2
