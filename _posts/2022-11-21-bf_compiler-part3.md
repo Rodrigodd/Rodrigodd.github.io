@@ -24,7 +24,7 @@ compiler using the Cranelift machine code generator.
 
 [Cranelift] is a machine code generator written in Rust, similar to tools like
 LLVM or GCC's backend. As briefly discussed at the end of the last part, these
-tools are used to crate an abstraction layer between language implementations
+tools are used to create an abstraction layer between language implementations
 and their compilation targets, by means of a target-independent intermediate
 representation (IR).
 
