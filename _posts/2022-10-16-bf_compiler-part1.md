@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  "Compiling Brainfuck code - Part 1: A Optimized Interpreter"
+title:  "Compiling Brainfuck code - Part 1: An Optimized Interpreter"
 date:   2022-10-21 15:00:00 -0300
 modified_date:   2022-11-07 15:00:00 -0300
 ---
@@ -27,13 +27,13 @@ the brainfuck programming language, in increasing degrees of complexity.
 # The Brainfuck language
 
 [Brainfuck] is one of the most famous esoteric programming languages. It was
-first design by Urban Müller, with the goal of being a Turing complete language
+first designed by Urban Müller, with the goal of being a Turing complete language
 whose compiler could be the smallest possible.
 
 [Brainfuck]: https://esolangs.org/wiki/Brainfuck
 
-By being esoteric, it isn't practical to write programs in, but its simplicity
-make this language one of the easiest to implement, and will be used here to
+By being esoteric, it isn't practical to write programs in but its simplicity
+makes this language one of the easiest to implement, and will be used here to
 lower the barrier in exploring more advanced topics in language implementation,
 such as machine code generation.
 
@@ -42,16 +42,16 @@ sequence of these instructions, that act upon an array of memory cells, each
 initialized with the value 0. There is also a pointer, initially pointing to
 the first cell, that is used to interact with the memory.
 
-The instructions are the following:
+The instructions are as follows:
 - `>`: move the pointer to the right.
 - `<`: move the pointer to the left.
 - `+`: increase the value at the pointer by 1.
 - `-`: decrease the value at the pointer by 1.
-- `.`: Output the value at the pointer to stdout.
-- `,`: Set the value at the pointer to the value read from stdin.
+- `.`: output the value at the pointer to stdout.
+- `,`: set the value at the pointer to the value read from stdin.
 - `[`: jump forward to the matching `]` if the value at the pointer is 0.
 - `]`: jump backward to the matching `[` if the value at the pointer is not 0.
-- Any other symbol is treated as comment, and is ignored.
+- Any other symbol is treated as comment and is ignored.
 
 For example, to print the numbers from 1 to 5, you can do:
 ```brainfuck
@@ -64,25 +64,25 @@ increment cell 0; print it; decrement cell 1; loop while cell 1 is not 0
 ```
 
 The language does not have an official specification, so some details may
-differ by the implementation, like the length of the array, or what the maximum
-value of a memory cell is, and what happen on overflow.
+vary from implementation to implementation, like the length of the array, or what the maximum
+value of a memory cell is, and what happens on overflow.
 
 I will follow [the original implementation][orig] here, where the array has a
 length of 30,000 cells, each cell is 1 byte in size, and the value does a
 two-complement wrapping on overflow. But my implementation will diverge on
-stdin EOF behavior, and the pointer will wrap around when goes out of bound.
+stdin EOF behavior and the pointer will wrap around when it goes out of bounds.
 
 [orig]: http://aminet.net/package/dev/lang/brainfuck-2
 
 # Part 1: a basic interpreter
 
-The easiest form of implementing a programming language, is to write an
+The easiest form of implementing a programming language is to write an
 interpreter for it. For normal languages, this can be done, for example, by
 reading the source code from a file, parsing it in an abstract syntax tree, and
 walking through that tree, executing each of its instructions.
 
 But for brainfuck, we do not need to do any actual parsing, and if we allow
-brackets to not have a match, any input file will be a valid brainfuck code.
+brackets to not have a match, any input file will be valid brainfuck code.
 This means that we can execute the brainfuck code directly from the source
 file.
 
@@ -152,8 +152,8 @@ b'<' => pointer = (pointer + memory.len() - 1) % memory.len(),
 `[` and `]` are more complicated. If we pass the instruction condition, we
 start traversing the program, updating `deep` for each `[` and `]` we find.
 When the deep reaches 0, we have found the matching bracket. We also check if
-the `program_counter` goes out of bounds (when there is no pair), and
-terminates the program.
+the `program_counter` goes out of bounds (when there is no pair) and
+terminate the program.
 
 Note that at the end of the loop `program_counter` will be on the matching
 bracket, which would cause an infinite loop, but this will be fixed by the
@@ -203,13 +203,13 @@ b']' => {
 ```
 
 And we are done! That code does not handle errors graciously, and unmatching
-bracket simply terminate the program, but it's only [68 lines of
+bracket simply terminates the program, but it's only [68 lines of
 code][68lines]!
 
 [68lines]: https://github.com/Rodrigodd/bf-compiler/blob/99cb9db00f03ee2c53bdc8e3b80e5da4c0976206/interpreter/src/main.rs
 
-But of course we can do much better, and not only in error handling. A
-brainfuck code could have a lot of comment characters, and we are traversing
+But of course we can do much better, and not only in error handling.
+Brainfuck code could have a lot of comment characters, and we are traversing
 all of them. This is particularly bad on loops.
 
 To solve this, we can remove the comment symbols right after reading the file:
@@ -223,7 +223,7 @@ let source: Vec<u8> = source
 
 But we can do even better. One of the principals of Rust is to make invalid
 states unrepresentable. Here we have only 6 instructions, but it is being
-represented by a `u8`, that contains 256 valid states. So, it is make more sense
+represented by a `u8`, that contains 256 valid states. So, it makes more sense
 to represent this instructions by an enum:
 
 ```rust
@@ -240,7 +240,7 @@ enum Instruction {
 }
 ```
 
-Then the previous snip becomes:
+Then the previous code becomes:
 
 ```rust
 let instructions: Vec<Instruction> = source
@@ -341,8 +341,8 @@ an idiomatic and well-written interpreter in [157 lines of Rust code][157lines].
 
 ## Measuring the interpreter performance
 
-The goal here is to progressive implement more complex versions of the
-interpreter/compiler, and that complexity aim to increase the runtime
+The goal here is to progressively implement more complex versions of the
+interpreter/compiler, and that complexity aims to increase the runtime
 performance of our brainfuck programs. So it is important that we keep track of
 how fast our interpreter is getting.
 
@@ -371,18 +371,18 @@ The current interpreter has run mandelbrot.bf in 96.1 seconds and factor.bf in 2
 
 We can optimize our interpreter in multiple ways. That could be done by making
 some micro optimization to our interpreter code, like replacing indexing by raw
-pointers, looking up at generated assembly for optimization opportunities, etc.
+pointers, looking at generated assembly for optimization opportunities, etc.
 But before that, we have even greater optimization opportunities.
 
 ### Precomputing the paring brackets addresses.
 
 Every time we encounter a `[` or `]`, and pass the jump condition, we search
-for the paring bracket. But the paring brackets are always the same, so there is
+for the paring bracket. But the pairing brackets are always the same, so there is
 no need to search them every time.
 
-So the most obvious optimization that we can do now is to precompute the paring
+So the most obvious optimization that we can do now is to precompute the pairing
 branch of each bracket, and store them somewhere, and every time we execute a
-jump instruction, we look up the address of the paring bracket.
+jump instruction, we look up the address of the pairing bracket.
 
 In our case we will store the pairing bracket as a field of our `Instruction`
 enum, because it is the simpler thing to do, and later more instructions will
@@ -391,7 +391,7 @@ have a field.
 So our `Instruction` enum becomes[^instruction_size]:
 
 [^instruction_size]: Note that here I am using a `usize` for the index of the
-    pairing bracket, which have 8 bytes on a 64-bit system. This is causing the
+    pairing bracket, which has 8 bytes on a 64-bit system. This is causing the
     `Instruction` enum to have a size of 16 bytes (due to the discriminant and
     alignment). So a possible optimization could be to use a `u32` or a 
     `u16` here, depending on how big brainfuck programs your interpreter
@@ -468,7 +468,7 @@ for b in source {
 }
 ```
 
-Also noticed that there could be more `]` than `[`, making the pop return
+Also notice that there could be more `]` than `[`, making the pop return
 `None`. In that case we are returning an error. Because this is the only
 possible error when parsing brainfuck code, I am defining the error as a simple
 tuple struct instead of a `enum`, as it is usually done:
@@ -533,7 +533,7 @@ fn main() -> ExitCode {
         Ok(x) => x,
         Err(UnbalancedBrackets(c, address)) => {
             eprintln!(
-                "Error parsing file: didn't found pair for `{}` at instruction index {}",
+                "Error parsing file: didn't find pair for `{}` at instruction index {}",
                 c, address
             );
             return ExitCode::from(3);
@@ -565,8 +565,8 @@ you will see that there are a lot of instructions repeating in sequence.
 
 Let start with increment. So instead of repeating an increment `n` times, we can
 replace them by a single add `n` instruction. Even better, we can replace both
-increment and decrement instructions by a single `Add(u8)` instructions,
-because a subtraction by `n` can be represented by an addition by the
+increment and decrement instructions by a single `Add(u8)` instruction,
+because a subtraction by `n` can be represented as an addition via the
 two-complement on `n` (or `n.wrapping_neg()` in our case).
 
 So `Instruction` becomes:
@@ -617,7 +617,7 @@ Running it:
 
 ![](/assets/brainfuck/plot1.svg "A mean decrease of 0.26% from the previous result"){:style="display:block; margin-left:auto; margin-right:auto"}
 
-Well... it was not a big reduction as I was expecting, only 0.26%. 0.26 ± 0.37
+Well... it was not as big of a reduction as I was expecting, only 0.26%. 0.26 ± 0.37
 percent to be more precise. It is even uncertain that it really decreased.
 
 But let's do the same for the `Move` instructions:
@@ -672,11 +672,11 @@ Running again:
 
 Wow! This is what I was looking for, more than 3 times in performance increase!
 
-But now, there is the question? Why optimizing the increment/decrement results
+But now, there is the question: Why does optimizing the increment/decrement result
 in such a small improvement, but optimizing the move instructions causes
-so big change? Well, if I have paid more attention to the source code of
+such a big change? Well, if I had paid more attention to the source code of
 [mandelbrot.bf][mandel] and of [factor.bf][factor], I could have noticed that
-there is much more '>'s and '<'s than '+'s and '-'s:
+there are much more '>'s and '<'s than '+'s and '-'s:
 
 |   | mandelbrot.bf | factor.bf |
 |:-:|--------------:|----------:|
@@ -689,7 +689,7 @@ there is much more '>'s and '<'s than '+'s and '-'s:
 | . | 3             | 7         |
 | , | 0             | 1         |
 
-But what really is important is the number of times these instructions are
+But what's really important is the number of times these instructions are
 executed at runtime. In that case we can [modify our interpreter][prof] to
 count the number of instructions being executed:
 
@@ -708,8 +708,8 @@ count the number of instructions being executed:
 | ----- | -------------- | ------------- | ------------- | ------------- |
 | Total | 10,521,107,970 | 3,226,569,468 | 3,018,468,909 | 1,242,237,371 |
 
-Now, with this data, everything become much more clear. The `Add` optimization
-have decreased the total number of operation by only 0.24%, and the `Move`
+Now, with this data, everything becomes much more clear. The `Add` optimization
+has decreased the total number of operation by only 0.24%, and the `Move`
 optimization has decreased it by 69%!
 
 But, of course, we can always do better.
@@ -717,10 +717,10 @@ But, of course, we can always do better.
 ### Optimizing higher constructs
 
 So we have already implemented an optimization that changes a single instruction,
-and one that replaces a repeated instruction by a single one. Then next step is
+and one that replaces a repeated instruction by a single one. The next step is
 to replace a set of distinct instructions by a single one.
 
-In brainfuck there are a lot of basic operations that need to involve multiple
+In brainfuck, there are a lot of basic operations that need to involve multiple
 instructions. For example, clearing a cell (`[-]` or `[+]`), adding a value of
 one cell to another (add to the third right would be `[->>>+<<<]`, but this
 clears the original value), duplicating a cell (`[->>>+>+<<<<]`), etc.
@@ -729,7 +729,7 @@ Many of these operations are basically loops with instructions inside. In this
 case, we can profile our programs by counting how many times a given loop is
 run, which boils down to counting how many times each particular `]` is
 executed. And then we present this data by deduplicating identical loops and
-displaying them in descendant order.
+displaying them in descending order.
 
 Running [the new profiling][prof_loop] for `factor.bf`:
 
@@ -749,7 +749,7 @@ Running [the new profiling][prof_loop] for `factor.bf`:
 |10 |  5,586,229| [-1>3+2<3]
 
 In first place comes the loop `[-<<<<<<<<<<+>>>>>>>>>]` (the annotation above
-is in compressed format), the "add cell to another" operation, running for 32
+is in compressed format), the "add cell to another" operation, running 32
 million of times! In fact, positions 3, 6, 7, 8 and 10 are also the same
 operation. Position 2 is the "clear cell operation" (`[-]`), and position 4, 5
 and 9 is the "duplicate cell" (`[->>>+>+<<<<]`).
@@ -770,20 +770,20 @@ For the `mandelbrot.bf`:
 |10 |    9,017,333 | [-1<4+1>1[<1-1>1-1<6+1>6]<1[-1>1+1<1]>4]
 
 The mandelbrot one was less predictable. In the first and second place there is
-the "move 9 cell right/left repeatedly until encounters a 0". In 4, it is the
+the "move 9 cell right/left repeatedly until it encounters a 0". In 4, it is the
 "add cell to another". 7 is the "clear cell" operation.
 
 The other loops appear to be doing more specific operations (which may be giving
-a glimpse on the mandelbrot algorithm). 3, which is the outer loop of 4,
+a glimpse on how the mandelbrot algorithm works). 3, which is the outer loop of 4,
 appears to be shifting the elements of an array, where each element contains 9
-cells. 6 and 8 appears to be duplicating some cell for each element of the
-array, using a temporary cell for that. 10 is more complicated, but appears to
+cells. 6 and 8 appear to be duplicating some cell for each element of the
+array, using a temporary cell for that. 10 is more complicated but appears to
 be another operation in the array.
 
 Well, each of the operations described above can be executed by the computer in
-a much more efficiently way if they are implemented by a "real" programming
+a much more efficient way if they are implemented by a "real" programming
 language. So, we can identify some of these operations in the source code, and
-replace them by a single instruction that implement them in Rust.
+replace them by a single instruction implemented in Rust.
 
 In this case, I will follow the original blog posts, and implement instructions
 for the "clear cell", "add cell to another" and "move until 0" operators.
@@ -841,7 +841,7 @@ Running it:
 
 ![](/assets/brainfuck/plot3.svg "A mean decreased of 4.5% from the previous result"){:style="display:block; margin-left:auto; margin-right:auto"}
 
-A mean decreased of 4.5% in execution time. And it decreased the total number of
+A mean decrease of 4.5% in execution time. And it decreased the total number of
 instructions by 0.80% and 4.59%, for `mandelbrot.bf` and `factor.bf`,
 respectively.
 
@@ -943,19 +943,19 @@ the mandelbrot.bf. Time goes down by 18.61% on mandelbrot and 3.79% on factor!
 
 # About Interpreters and Compilers
 
-What we basically have done through this post, is basically transform the
+What we basically have done through this post, is to transform the
 program source code into instructions that can be interpreted in a more
 efficient way. We also looked for common patterns in the code and created
 specific instructions for them, increasing the performance even more.
 
-These are already a basic version of what interpreters and compilers do.
+These are already basic ideas of what interpreters and compilers do.
 Instead of interpreting/compiling the code directly from its source code (like
 how AST-walking interpreters, or single pass compilers do), they most of the
 time convert them to an intermediate representation (IR) that is more suitable
 for interpreting, compiling, applying optimizations, etc.
 
 For example, in Lua an AST is not even created, the source code is directly
-compile, in a single pass, to *bytecode*, which is the IR used by the Lua
+compiled, in a single pass, to *bytecode*, which is the IR used by the Lua
 interpreter.
 
 A more complex example would be Rust. In Rust, the code AST is first converted
@@ -964,7 +964,7 @@ which is used for type inference, trait solving and type checking. After that,
 it is lowered to Mid-Level Intermediate Representation (MIR), which is used for
 borrow checking, applying optimizations and monomorphization collecting. And
 finally, MIR is converted to LLVM-IR, which is passed to LLVM to apply more
-optimizations and compile down to machine code. [More details can be found
+optimizations and only then compiled down to machine code. [More details can be found
 here][rust_overview].
 
 [rust_overview]: https://rustc-dev-guide.rust-lang.org/overview.html
@@ -989,7 +989,7 @@ reach them, etc. We can also go `unsafe` and remove bound checks with
 
 [micro]: https://github.com/Rodrigodd/bf-compiler/commit/b6591ebd367d89cceff166df09ca500c172d3873
 
-But by this being a normal interpreter, there will always be a significant
+But this being a normal interpreter, there will always be a significant
 overhead introduced by the interpreter loop that cannot be removed (unless we
 manage to transform the source code to a single instruction).
 
