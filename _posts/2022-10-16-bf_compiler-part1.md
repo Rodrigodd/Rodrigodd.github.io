@@ -51,7 +51,7 @@ The instructions are as follows:
 - `,`: set the value at the pointer to the value read from stdin.
 - `[`: jump forward to the matching `]` if the value at the pointer is 0.
 - `]`: jump backward to the matching `[` if the value at the pointer is not 0.
-- Any other symbol is treated as comment and is ignored.
+- Any other symbol is treated as a comment and ignored.
 
 For example, to print the numbers from 1 to 5, you can do:
 ```brainfuck
@@ -708,7 +708,7 @@ count the number of instructions being executed:
 | ----- | -------------- | ------------- | ------------- | ------------- |
 | Total | 10,521,107,970 | 3,226,569,468 | 3,018,468,909 | 1,242,237,371 |
 
-Now, with this data, everything becomes much more clear. The `Add` optimization
+Now, with this data, everything becomes much clearer. The `Add` optimization
 has decreased the total number of operation by only 0.24%, and the `Move`
 optimization has decreased it by 69%!
 
