@@ -5,8 +5,6 @@ date:   2022-11-26 18:00:00 -0300
 ---
 
 TODO:
-- When writing the hello world assembly, explain what is each section name
-  means.
 - Link to `man elf` before start explaining the `readelf` output. And maybe
   during the explaining too?
 - Revise when I was explaining the symbols. Local symbols can be used for
@@ -104,8 +102,13 @@ _start:
 	syscall              ; call the kernel
 ```
 
+In the code above we have two sections. Each section holds a chunk arbitrary
+data. The sections can have any name, but the linker will map the section
+with the `.data` to a segment that will have a read and write permissions when
+executed, and the `.text` to a segment with read and execute permission.
+
 In the code above I declared in the section .data the byte sequence `"Hello
-World!\n"` (the 10 there is the code for line-break in ASCII) with the label
+World!\n"` (the 10 there is the ASCII code for line-break) with the label
 `hello`, and a constant for the string length (compute by current address (`$`)
 minus the `hello` address). And in the section `.text` I am declaring that the
 label `_start` is global, and declaring it preceding the code for printing the
@@ -134,9 +137,10 @@ Hello World!
 It works!
 
 Now, let's take a close look in the object file and the executable file. For
-this, we can use the [readelf] utility. You can use the `-a` flag to show all
-the information that I will be explaining here in one go, but I will go in
-parts here.
+this, we can use the [readelf] utility. You can use the `-a` flag to show in one
+go all the information that I will be explaining, but I will go in parts here.
+
+[readelf]: https://man7.org/linux/man-pages/man1/readelf.1.html
 
 First, lake take a look at the `hello.o` object file:
 
