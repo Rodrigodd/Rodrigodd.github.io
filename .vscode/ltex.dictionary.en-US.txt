@@ -39,3 +39,7 @@ cranelift-codegen
 cranelift-frontend
 Singlepass
 cargo-show-asm
+TODO
+readelf
+syscall
+LTO
