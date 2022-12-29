@@ -9,8 +9,6 @@ TODO:
   during the explaining too?
 
 - Link the relocation type to its docs.
-- Talk about the program header only after showing the section header table, and
-  the disassembly.
 - Talk about page alignment when talking about the program header's segments
   mapping.
 - Try to remember parts were I was stuck on, and comment about them here?
@@ -297,9 +295,63 @@ This means that during linking, after the linker have set the location in memory
 that the `data` section should be loaded, it will path that instruction to the
 correct address of the `hello` string.
 
-And we can see all this in action, by inspecting the `./hello` executable file.
-If you run `readelf hello -a` the first thing that you will notice is that it
-now contains program header table:
+And we can see all this in action, by inspecting the `./hello` executable file:
+
+```shell
+$ readelf hello -S
+There are 6 section headers, starting at offset 0x2158:
+
+Section Headers:
+  [Nr] Name              Type             Address           Offset
+       Size              EntSize          Flags  Link  Info  Align
+  [ 0]                   NULL             0000000000000000  00000000
+       0000000000000000  0000000000000000           0     0     0
+  [ 1] .text             PROGBITS         0000000000401000  00001000
+       0000000000000027  0000000000000000  AX       0     0     16
+  [ 2] .data             PROGBITS         0000000000402000  00002000
+       000000000000000d  0000000000000000  WA       0     0     4
+  [ 3] .symtab           SYMTAB           0000000000000000  00002010
+       00000000000000f0  0000000000000018           4     6     8
+  [ 4] .strtab           STRTAB           0000000000000000  00002100
+       0000000000000031  0000000000000000           0     0     1
+  [ 5] .shstrtab         STRTAB           0000000000000000  00002131
+       0000000000000027  0000000000000000           0     0     1
+Key to Flags:
+  W (write), A (alloc), X (execute), M (merge), S (strings), I (info),
+  L (link order), O (extra OS processing required), G (group), T (TLS),
+  C (compressed), x (unknown), o (OS specific), E (exclude),
+  l (large), p (processor specific)
+```
+
+Here we can see that the address of the `.text` and `.data` sections have been
+set up to 0x401000 and 0x402000. Now if we take a look in the disassembly to see
+the relocation that took place:
+
+```shell
+objdump -d -M intel hello
+
+hello:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000000401000 <_start>:
+  401000:       b8 01 00 00 00          mov    eax,0x1
+  401005:       bf 01 00 00 00          mov    edi,0x1
+  40100a:       48 be 00 20 40 00 00    movabs rsi,0x402000
+  401011:       00 00 00
+  401014:       ba 0d 00 00 00          mov    edx,0xd
+  401019:       0f 05                   syscall
+  40101b:       b8 3c 00 00 00          mov    eax,0x3c
+  401020:       bf 00 00 00 00          mov    edi,0x0
+  401025:       0f 05                   syscall
+```
+
+Look! The address in the `movabs` instruction, at offset `0xc` was updated
+to `0x402000` (in little endian)!.
+
+Another thing you may notice if you run `readelf hello -a` is that it now
+contains program header table:
 
 ```shell
 $ readelf hello -l
@@ -337,63 +389,12 @@ memory]). Not sure why this is done.
 [virtual memory]: https://en.wikipedia.org/wiki/Virtual_memory
 
 The second one loads the `.text` section, with read and exec permissions, and
-the third loads `.data` with read and write permissions. The program headers
-themselves don't say which sections they are mapping (although readelf shows the
-mapping), but you can see them by comparing with the section header table:
+the third loads `.data` with read and write permissions. 
 
-```shell
-$ readelf hello -S
-There are 6 section headers, starting at offset 0x2158:
-
-Section Headers:
-  [Nr] Name              Type             Address           Offset
-       Size              EntSize          Flags  Link  Info  Align
-  [ 0]                   NULL             0000000000000000  00000000
-       0000000000000000  0000000000000000           0     0     0
-  [ 1] .text             PROGBITS         0000000000401000  00001000
-       0000000000000027  0000000000000000  AX       0     0     16
-  [ 2] .data             PROGBITS         0000000000402000  00002000
-       000000000000000d  0000000000000000  WA       0     0     4
-  [ 3] .symtab           SYMTAB           0000000000000000  00002010
-       00000000000000f0  0000000000000018           4     6     8
-  [ 4] .strtab           STRTAB           0000000000000000  00002100
-       0000000000000031  0000000000000000           0     0     1
-  [ 5] .shstrtab         STRTAB           0000000000000000  00002131
-       0000000000000027  0000000000000000           0     0     1
-Key to Flags:
-  W (write), A (alloc), X (execute), M (merge), S (strings), I (info),
-  L (link order), O (extra OS processing required), G (group), T (TLS),
-  C (compressed), x (unknown), o (OS specific), E (exclude),
-  l (large), p (processor specific)
-```
-
-Here we can see that the address and offset of the `.text` and `.data` sections
-coincide with the ones in the program header.
-
-Now we can take a look in the disassembly to see the relocation that took place:
-
-```shell
-objdump -d -M intel hello
-
-hello:     file format elf64-x86-64
-
-
-Disassembly of section .text:
-
-0000000000401000 <_start>:
-  401000:       b8 01 00 00 00          mov    eax,0x1
-  401005:       bf 01 00 00 00          mov    edi,0x1
-  40100a:       48 be 00 20 40 00 00    movabs rsi,0x402000
-  401011:       00 00 00
-  401014:       ba 0d 00 00 00          mov    edx,0xd
-  401019:       0f 05                   syscall
-  40101b:       b8 3c 00 00 00          mov    eax,0x3c
-  401020:       bf 00 00 00 00          mov    edi,0x0
-  401025:       0f 05                   syscall
-```
-
-And look! The address in the `movabs` instruction, at offset `0xc` was updated
-to `0x402000` (in little endian)!.
+The program headers themselves don't say which sections they are mapping
+(although readelf shows the mapping), but you can check this yourself by
+comparing the offset and address of the segments here, with the ones in the
+section header of each section.
 
 ## A minimal hello world
 
