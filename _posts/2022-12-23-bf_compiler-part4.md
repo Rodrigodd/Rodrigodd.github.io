@@ -8,8 +8,6 @@ TODO:
 - Link to `man elf` before start explaining the `readelf` output. And maybe
   during the explaining too?
 
-- Revise when I was explaining the symbols. Local symbols can be used for
-  relocation.
 - Talk about sh_link in the symbol section? And in the relocation section?
 - Link the relocation type to its docs.
 - Talk about the program header only after showing the section header table, and
@@ -69,15 +67,17 @@ To link all these object files into a complete program, you need to use a
 linker. Each object file has a list of symbols, that, among other things, are
 used to indicate what function the file define, and which ones they are using
 (that may be defined in another file). It also has a list of relocations, that
-are used to indicated which regions of the memory need to be modified, and how,
+are used to indicated which points in the memory need to be modified, and how,
 to connect the object files. The linker is the program that read this files and
 does all these modifications.
 
+We will see more practical examples of this further down.
+
 # Exploring ELF files
 
-As always, let's start by making a compiler for the simplest program that we can
-achieve. In the previous parts as was using the `add_1` function as example, but
-that don't make into an interesting enough program. So let's make a good old
+As always, we will start by making a compiler for the simplest program that we
+can achieve. In the previous parts as was using the `add1` function as example,
+but that don't make into an interesting enough program. So let's make a good old
 "hello world" program.
 
 In Linux x86-64 assembly, it would be:
@@ -108,17 +108,19 @@ data. The sections can have any name, but the linker will map the section
 with the `.data` to a segment that will have a read and write permissions when
 executed, and the `.text` to a segment with read and execute permission.
 
-In the code above I declared in the section .data the byte sequence `"Hello
-World!\n"` (the 10 there is the ASCII code for line-break) with the label
-`hello`, and a constant for the string length (compute by current address (`$`)
-minus the `hello` address). And in the section `.text` I am declaring that the
-label `_start` is global, and declaring it preceding the code for printing the
-string (using the 'write' syscall) and exiting (with the 'exit' syscall).
+In the section `.data` the byte sequence `"Hello World!\n"` (the 10 there is the
+ASCII code for line-break) with the label `hello`, and a constant for the string
+length (compute by current address (`$`) minus the `hello` address).
+
+And in the section `.text` I am declaring that the label `_start` is global
+(meaning that other objects can see it), and declaring it preceding the code for
+printing the string (using the 'write' syscall) and exiting (with the 'exit'
+syscall).
 
 Every label above will map to a symbol in the object file, that later will be
 used for applying relocations, debug purposes, etcetera. The `_start` symbol in
 specific will be used by the linker to tell where is the entry point of our
-executable.
+executable (and why it must be global).
 
 To assemble and link the program, we can use the assembler [NASM] and the linker
 [ld]:
