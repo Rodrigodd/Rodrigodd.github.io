@@ -12,8 +12,6 @@ TODO:
 - Talk about page alignment when talking about the program header's segments
   mapping.
 - Try to remember parts were I was stuck on, and comment about them here?
-- When showing the objdump of hello world, comment about the instructions after
-  the hello label.
 - Comment about the size of the executables throughout the post.
 - Fix Jekyll theme to include a space between the end of the post, and the side
   notes.
@@ -464,6 +462,9 @@ Disassembly of section .text:
   2c:   72 6c                   jb     9a <hello+0x76>
   2e:   64 21 0a                and    DWORD PTR fs:[rdx],ecx
 ```
+
+Also, the objdump is trying to interpret the string as instruction because it is
+in the `.text` section.
 
 # The object crate
 
