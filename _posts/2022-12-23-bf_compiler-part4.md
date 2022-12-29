@@ -1430,16 +1430,16 @@ hopefully our program don't need them, and everything works!
 
 In this post we have seen the basic of object files, and how compile our
 programs to them, and them link them. But we only covered the very basic of
-this. There still things like dynamic libraries and position independent
-executables, that we didn't cover.
+this. There still things that we didn't cover, like dynamic libraries, position independent
+executables, debug information, etc.
 
 Also, all these file formats are system dependent, and the relocations in them vary
 greatly between architectures, so we fall in the same problem that we discussed
 in the end of part 2. Thankfully code generators, like LLVM, also covers these
 problems.
 
-And a natural next step here would be to try exactly that using our Cranelift
-JIT compiler that we made in the last part. You can use [`cranelift-module`] and
+A natural next step here would be to try exactly that using our Cranelift JIT
+compiler that we made in the last part. You can use [`cranelift-module`] and
 [`cranelift-object`] to do that.
 
 [`cranelift-module`]: https://docs.rs/cranelift-module/latest/cranelift_module/
