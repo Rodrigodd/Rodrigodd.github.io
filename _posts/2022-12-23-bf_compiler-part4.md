@@ -13,13 +13,12 @@ TODO:
   mapping.
 - Try to remember parts were I was stuck on, and comment about them here?
 - Comment about the size of the executables throughout the post.
+- When talking about calling the exit syscall, talk about the libc.
+
 - Fix Jekyll theme to include a space between the end of the post, and the side
   notes.
 - Try to add labels to code blocks.
-- Discover how many libraries I need to be able to compile what `ld` alone.
-  Maybe use `rustc --crate-type=staticlib bf_lib.rs
-  --target=x86_64-pc-windows-gnu --print=native-static-libs` to do that?
-- When talking about calling the exit syscall, talk about the libc.
+- Add header anchors.
 
 This is the third post of a blog post series where I will reproduce [Eli
 Bendersky’s Adventures In JIT Compilation series][eli], but this time using the
@@ -1050,26 +1049,33 @@ $ ld hello.o libwrite.a
 ```
 
 If run the command above, you will notice that it will output almost 3000 lines
-of undefined symbols. That is because the rust library that we build is static
-linked to the rust std, to in turn depends on a lot of dynamic libraries
-provided by the SO.
+of "undefined symbol" errors. That is because the rust library that we build is
+static linked to the rust standard library, that in turn depends on a lot of
+dynamic libraries provided by the OS.
 
 One way of fixing the error is by finding all libraries that define all the
-missing symbols, and add them as argument to the linker. This is kinda trick,
-and I am not even sure if this would work, and it will vary between Linux
-distros, so let's instead use `gcc` to link everything. It will already take
-care of linking all system libraries.
+missing symbols, and add them as argument to the linker. This is kinda trick, I
+am not even sure if this would work, and it will vary between Linux distros, so
+let's instead use `gcc` to link everything. It will already take care of linking
+all system libraries.
+
+The std also needs some extra static libraries. To get them you call pass
+`--print=native-static-libs` to the rustc invocation:
 
 ```shell
-$ gcc hello.o libwrite.a -nostartfiles -pthread -ldl -o hello
+$ rustc --crate-type=staticlib write.rs --print=native-static-libs
+note: Link against the following native artifacts when linking against this static library. The order and any duplication can be significant on some platforms.
+
+note: native-static-libs: -lgcc_s -lutil -lrt -lpthread -lm -ldl -lc
+
+$ gcc hello.o libwrite.a -o hello -nostartfiles -lgcc_s -lutil -lrt -lpthread -lm -ldl -lc
 $ ./hello
 Hello world!
 ```
 
 And it works! Note that I need to pass `-nostartfiles`, because I am declaring
 `_start` directly, instead of declaring a `main` function that would be called
-by C runtime. And I also need to pass `-pthread` and `-ldl` to also include some
-libraries that rust std is using.
+by the C runtime.
 
 # A Static Compiler
 
@@ -1078,8 +1084,8 @@ library with all functions that we will use in our compiled brainfuck programs.
 
 All will put them in a file called `bf_lib.rs`. There will be our `read` and
 `write` function, and also a function for exiting. Also, these function will not
-return errors, because there is no one to report them anymore. Instead, they only
-print the error message and exit.
+return errors, because there is no one to report them anymore. Instead, they
+only print the error message and exit.
 
 I will also prefix each function with `bf_` to avoid symbol conflicts:
 
