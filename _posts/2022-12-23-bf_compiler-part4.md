@@ -8,7 +8,6 @@ TODO:
 - Link to `man elf` before start explaining the `readelf` output. And maybe
   during the explaining too?
 
-- Talk about sh_link in the symbol section? And in the relocation section?
 - Link the relocation type to its docs.
 - Talk about the program header only after showing the section header table, and
   the disassembly.
@@ -208,15 +207,17 @@ Key to Flags:
 
 Following it, we have the section headers. The first header is always a null
 one. Here we can see that we have the headers for the `.data` and `.text`
-sections, that we have written in our assembly code, but we also have some other
+sections that we have written in our assembly code. But we also have some other
 sections that hold, respectively, the strings for the name of the sections
 headers, the symbols, the string for the symbol names and such, and lastly the
 relocations for the .text section.
 
-Each section header tells some information about the section, and points to
-where its content is in the file. The readelf can pretty print the contents of
-some sections, as we will see in a moment, but you can also use `-x` to view
-they hex dump:
+Each section header tells some information about the section, like where its
+content is in the file. It may also be linked to another section (like `.symtab`
+has a link to the table that contains the symbol names).
+
+The readelf can pretty print the contents of some sections, as we will see in a
+moment, but you can also use `-x` to view they hex dump:
 
 ```shell
 $ readelf hello.o -x .shstrtab
@@ -229,7 +230,7 @@ Hex dump of section '.shstrtab':
 ```
 
 Here for example we can see that the "section header string table" is a list of
-strings separated by `\0`, with the first string being empty.
+null byte terminated strings, with the first string being empty.
 
 ```shell
 $ readelf hello.o -s
@@ -245,7 +246,7 @@ Symbol table '.symtab' contains 7 entries:
      6: 0000000000000000     0 NOTYPE  GLOBAL DEFAULT    2 _start
 ```
 
-Here we can see a list of the file symbols. The first one is always null. There
+Here we can see a list of the symbols. The first one is always null. There
 are the symbols that we defined in our assembly, and some others introduced by
 the assembler like the file name and symbols for each section (used for
 relocation).
@@ -263,10 +264,10 @@ Relocation section '.rela.text' at offset 0x350 contains 1 entry:
 ```
 
 And lastly we have the relocations. Here we have only a single one for the
-`.text` section that applies at offset `0xc`, it is of type `R_X86_64_64` (each
-processor has its own set of relocation types), which means that it replaces a
-64bit word by the value of the symbol number 2 (the symbol for the `.data`
-section).
+`.text` section that applies at offset `0xc`, use the symbol 2 (the first 2
+bytes of info) on the linked section (`.symtab`) and is of type `R_X86_64_64`
+(each processor has its own set of relocation types). This means that it
+replaces a 64bit word by the value of the symbol `.data`.
 
 If we look at the disassembly of the machine code, we can see that in offset
 `0xc` we have the last 8 bytes of the `movabs` instruction, the one that loads
@@ -292,7 +293,7 @@ Disassembly of section .text:
   25:   0f 05                   syscall
 ```
 
-This means that after linking, and the linker have set the location in memory
+This means that during linking, after the linker have set the location in memory
 that the `data` section should be loaded, it will path that instruction to the
 correct address of the `hello` string.
 
