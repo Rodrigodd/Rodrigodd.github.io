@@ -7,6 +7,7 @@ date:   2022-11-26 18:00:00 -0300
 TODO:
 - Link to `man elf` before start explaining the `readelf` output. And maybe
   during the explaining too?
+
 - Revise when I was explaining the symbols. Local symbols can be used for
   relocation.
 - Talk about sh_link in the symbol section? And in the relocation section?
@@ -171,6 +172,9 @@ ELF Header:
 First we have the ELF header, with basic information like version, ABI, etc.,
 and the location of the program headers (only relevant for executable files) and
 the section headers.
+
+You may want to take a look on [the man page for the ELF format][ELF] to see in
+more detail what each field in the header means, and also for the parts below.
 
 ```shell
 $ readelf hello.o -S
