@@ -16,3 +16,20 @@
         .nn { color: #d3a250; }
     }
 }
+
+// show anchor on hover
+h1:hover .anchor,
+h2:hover .anchor,
+h3:hover .anchor,
+h4:hover .anchor,
+h5:hover .anchor {
+    visibility: visible,
+}
+
+h1 .anchor,
+h2 .anchor,
+h3 .anchor,
+h4 .anchor,
+h5 .anchor {
+    visibility: hidden,
+}

@@ -8,7 +8,6 @@ TODO:
 - Fix Jekyll theme to include a space between the end of the post, and the side
   notes.
 - Try to add labels to code blocks.
-- Add header anchors.
 - At "a zero dependency static compiler", link to mentioned code of part 2.
 
 This is the third post of a blog post series where I reproduce [Eli Bendersky’s
