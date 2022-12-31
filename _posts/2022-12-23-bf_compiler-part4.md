@@ -4,9 +4,6 @@ title:  "Compiling Brainfuck code - Part 4: A Static Compiler"
 date:   2022-11-26 18:00:00 -0300
 ---
 
-TODO:
-- Try to add labels to code blocks.
-
 This is the third post of a blog post series where I reproduce [Eli Bendersky’s
 Adventures In JIT Compilation series][eli], but this time using the [Rust
 programming language][rust].
