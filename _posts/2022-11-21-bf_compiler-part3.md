@@ -1060,3 +1060,9 @@ compilation.
 And this is exactly what we will do in [the next part][part4]. We will see how
 we can get our generated machine code and serialize it to an executable file,
 like a ELF file.
+
+
+All the code developed during these series [can be found here][the_code] (may
+not be exactly equal to one showed here).
+
+[the_code]: https://github.com/Rodrigodd/bf-compiler

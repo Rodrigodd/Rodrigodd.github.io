@@ -999,3 +999,8 @@ So we will stop enhancing this interpreter for now, and, in [the next
 part][part2], we will build a JIT interpreter, that will convert our source code
 directly to machine code, and remove the interpreter loop altogether.
 
+
+All the code developed during these series [can be found here][the_code] (may
+not be exactly equal to one showed here).
+
+[the_code]: https://github.com/Rodrigodd/bf-compiler

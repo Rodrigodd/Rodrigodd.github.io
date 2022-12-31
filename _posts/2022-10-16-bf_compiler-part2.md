@@ -1481,3 +1481,9 @@ on Android devices.
 
 [Wasmtime]: https://github.com/bytecodealliance/wasmtime/
 [rustc_codegen_cranelift]: https://github.com/bjorn3/rustc_codegen_cranelift
+
+
+All the code developed during these series [can be found here][the_code] (may
+not be exactly equal to one showed here).
+
+[the_code]: https://github.com/Rodrigodd/bf-compiler
