@@ -61,7 +61,7 @@ can achieve. In the previous parts we were using the `add1` function as example,
 but that don't make into an interesting enough program. So let's make a good old
 "hello world" program.
 
-In Linux x86-64 assembly, it would be:
+On Linux x86-64 assembly, it would be:
 
 ```nasm
 section .data
@@ -336,7 +336,7 @@ Look! The address in the `movabs` instruction, at offset `0xc` was updated
 to `0x402000` (in little endian)!.
 
 Another thing you may notice if you run `readelf hello -a` is that it now
-contains program header table:
+contains a program header table:
 
 ```shell
 $ readelf hello -l
@@ -385,9 +385,9 @@ section header of each section.
 
 Again, is always good to start experimenting with an idea by implementing the
 simplest example that we can make. In our case that would be compiling a hello
-world program. But the one that I showed is not minimal enough, yet.
+world program. But the one that I showed is still not minimal enough.
 
-Because our `"Hello World!"` string is only read during the execution, it does
+Because our `'Hello World!\n'` string is only read during the execution, it does
 not need to live in a section with read and write permission like the `.data`.
 We could but it in a `.rodata`, which is read only, but we can take advantage
 that the `.text` segment has read permission and put the string there, saving a
@@ -526,7 +526,7 @@ let mut obj = object::write::Object::new(
 );
 ```
 
-Next we can add our `_start` symbol to the object:
+Next we can add the `_start` symbol to the object:
 
 ```rust
 let start = obj.add_symbol(Symbol {
@@ -618,9 +618,9 @@ Now we know everything necessary to make the first version of our brainfuck
 compiler!
 
 First, I will take an old version of our JIT compiler, the one right after [we
-start using `dynasm`][previousJIT], while we were still using syscalls. This is because now
-when our compiled code will not have access to the rust functions (unless we
-compile them to a library and link them, as we will see later).
+start using `dynasm`][previousJIT], while we were still using syscalls. This is
+because now our compiled code will not have access to Rust functions (unless
+we compile them to a library and link them, as we will see later).
 
 [previousJIT]: {% post_url 2022-10-16-bf_compiler-part2 %}#improving-our-workflow-with-dynasm
 
@@ -920,9 +920,9 @@ Relocation section '.rela.text' at offset 0x300 contains 1 entry:
 00000000000d  000500000002 R_X86_64_PC32     0000000000000000 my_write - 4
 ```
 
-The relocation is of type `R_X86_64_PC32`, which means that it writes a 32-bit a
-word with the offset from the relocation to the given symbol. This is because
-the call instruction receives an offset as argument.
+The relocation is of type `R_X86_64_PC32`, which means that it writes a 32-bit
+word whose value is the offset from the relocation to the given symbol. This is
+because the call instruction receives an offset as argument.
 
 But the call instruction receives an offset relative to the address of the next
 instruction, so instead of writing `S - P` (symbol minus relocation address) it
@@ -1007,7 +1007,7 @@ Hello world!
 ```
 
 But now, let's try, instead of linking to an object written in assembly, link to
-a static lib written in rust.
+a static lib written in Rust.
 
 For this, let's rewrite `write.as` as `write.rs`:
 
@@ -1044,8 +1044,8 @@ $ ld hello.o libwrite.a
 ```
 
 If run the command above, you will notice that it will output almost 3000 lines
-of "undefined symbol" errors. That is because the rust library that we build is
-static linked to the rust standard library, that in turn depends on some
+of "undefined symbol" errors. That is because the Rust library that we build is
+static linked to the Rust standard library, that in turn depends on some
 libraries provided by the OS.
 
 One way of fixing the error is by finding all libraries that define all the
@@ -1054,8 +1054,8 @@ am not even sure if this would work, and it will vary between Linux distros, so
 let's instead use `gcc` to link everything. It will already take care of linking
 all system libraries.
 
-The std also needs some extra static libraries. To get them you can pass
-`--print=native-static-libs` to the rustc invocation:
+The std also needs some extra static libraries. To get a list of them you can
+pass `--print=native-static-libs` to the rustc invocation:
 
 ```shell
 $ rustc --crate-type=staticlib write.rs --print=native-static-libs
@@ -1136,7 +1136,7 @@ pub unsafe extern "sysv64" fn bf_exit() {
 ```
 
 Now in our compiler, we will call these functions instead of the syscall. We
-need to register the relocation for each call.
+need to register the relocations for each call.
 
 So `Program` becomes:
 
@@ -1314,7 +1314,7 @@ objects with GCC:
 
 ```
 
-If you test the executable now, you will notice that nothing happens. And if you
+If you test the executable now, you may notice that nothing happens. And if you
 open it on a debugger, you will notice that it is actually crashing on an access
 violation when clearing the first byte of the memory.
 
@@ -1396,7 +1396,7 @@ thankfully by setting `panic=abort`, enabling LTO and increasing the
 optimization level, these symbols have gone away.
 
 It still outputs some warnings about unhandled static initializers, but
-hopefully our program don't need them, and everything works!
+thankfully our program don't need them (I think), and everything works!
 
 # Future work
 
