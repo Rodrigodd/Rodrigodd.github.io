@@ -1281,7 +1281,7 @@ let (format, entry_name) = if cfg!(target_os = "windows") {
 } else {
     unimplemented!("Only Linux and Windows are implemented")
 };
-
+let entry_name = entry_name.as_bytes();
 
 let mut obj = object::write::Object::new(
     format,
@@ -1289,16 +1289,10 @@ let mut obj = object::write::Object::new(
     object::Endianness::Little,
 );
 
-let start = obj.add_symbol(Symbol {
-    name: entry_name.as_bytes().to_vec(),
-    value: 0,
-    size: 0,
-    kind: object::SymbolKind::Text,
-    scope: object::SymbolScope::Linkage,
-    weak: false,
-    section: object::write::SymbolSection::Undefined,
-    flags: SymbolFlags::None,
-});
+let mut add_symbol = |name: &[u8]| { /* ... */ };
+
+let start = add_symbol(entry_name);
+// ...
 ```
 
 Then, if we use the `x86_64-pc-windows-gnu` target, we can continue to link our
