@@ -14,7 +14,7 @@ Bendersky’s Adventures In JIT Compilation series][eli], but this time using th
 - [Part 1: An Optimized Interpreter]({% post_url 2022-10-16-bf_compiler-part1 %})
 - **Part 2: A Singlepass JIT Compiler**
 - [Part 3: A Cranelift JIT Compiler]({% post_url 2022-11-21-bf_compiler-part3 %})
-- Part 4: A Static Compiler (WIP)
+- [Part 4: A Static Compiler]({% post_url 2022-12-23-bf_compiler-part4 %})
 
 In the [previous part]({% post_url 2022-10-16-bf_compiler-part1 %}) we made an
 optimized brainfuck interpreter. In this part we will make a brainfuck JIT
