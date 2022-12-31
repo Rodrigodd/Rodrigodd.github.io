@@ -5,8 +5,6 @@ date:   2022-11-26 18:00:00 -0300
 ---
 
 TODO:
-- Fix Jekyll theme to include a space between the end of the post, and the side
-  notes.
 - Try to add labels to code blocks.
 
 This is the third post of a blog post series where I reproduce [Eli Bendersky’s
