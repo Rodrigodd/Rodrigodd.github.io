@@ -12,9 +12,12 @@ Bendersky’s Adventures In JIT Compilation series][eli], but this time using th
 [Rust]: https://www.rust-lang.org
 
 - [Part 1: An Optimized Interpreter]({% post_url 2022-10-16-bf_compiler-part1 %})
-- [Part 2: A Singlepass JIT Compiler]({% post_url 2022-10-16-bf_compiler-part2 %})
+- [Part 2: A Singlepass JIT Compiler][part2]
 - **Part 3: A Cranelift JIT Compiler**
-- [Part 4: A Static Compiler]({% post_url 2022-12-23-bf_compiler-part4 %})
+- [Part 4: A Static Compiler][part4]
+
+[part2]: {% post_url 2022-10-16-bf_compiler-part2 %}
+[part4]: {% post_url 2022-12-23-bf_compiler-part4 %}
 
 In the [previous part]({% post_url 2022-10-16-bf_compiler-part2 %}) we made an
 x86 JIT compiler for brainfuck interpreter. In this part we will make a JIT
@@ -1054,6 +1057,6 @@ compilation.
     not emitting machine code directly, so "static compiled" or "native compiled"
     may be better suitable to "compiled languages" than "AOT compiled".
 
-And this is exactly what we will do in the next part. We will see how we can
-get our generated machine code and serialize it to an executable file, like a
-ELF file.
+And this is exactly what we will do in [the next part][part4]. We will see how
+we can get our generated machine code and serialize it to an executable file,
+like a ELF file.

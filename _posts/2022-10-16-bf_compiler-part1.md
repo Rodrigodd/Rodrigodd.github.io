@@ -11,9 +11,11 @@ Bendersky’s Adventures In JIT Compilation series][eli], but this time using th
 compiling native executables.
 
 - **Part 1: An Optimized Interpreter**
-- [Part 2: A Singlepass JIT Compiler]({% post_url 2022-10-16-bf_compiler-part2 %})
+- [Part 2: A Singlepass JIT Compiler][part2]
 - [Part 3: A Cranelift JIT Compiler]({% post_url 2022-11-21-bf_compiler-part3 %})
 - [Part 4: A Static Compiler]({% post_url 2022-12-23-bf_compiler-part4 %})
+
+[part2]: {% post_url 2022-10-16-bf_compiler-part2 %}
 
 The goal of this series is to give a small intro into writing compilers, and
 explore the tools in the Rust ecosystem that can be used for that.
@@ -993,7 +995,7 @@ But this being a normal interpreter, there will always be a significant
 overhead introduced by the interpreter loop that cannot be removed (unless we
 manage to transform the source code to a single instruction).
 
-So we will stop enhancing this interpreter for now, and, in the next part, we
-will build a JIT interpreter, that will convert our source code directly to
-machine code, and remove the interpreter loop altogether.
+So we will stop enhancing this interpreter for now, and, in [the next
+part][part2], we will build a JIT interpreter, that will convert our source code
+directly to machine code, and remove the interpreter loop altogether.
 
