@@ -8,7 +8,6 @@ TODO:
 - Fix Jekyll theme to include a space between the end of the post, and the side
   notes.
 - Try to add labels to code blocks.
-- At "a zero dependency static compiler", link to mentioned code of part 2.
 
 This is the third post of a blog post series where I reproduce [Eli Bendersky’s
 Adventures In JIT Compilation series][eli], but this time using the [Rust
@@ -615,15 +614,17 @@ Hello world!
 
 It works!
 
-# A zero-dependency static compiler
+# A zero-dependency Static Compiler
 
 Now we know everything necessary to make the first version of our brainfuck
 compiler!
 
-First, I will take an old version of our JIT compiler, the one right after we
-start using `dynasm`, while we were still using syscalls. This is because now
+First, I will take an old version of our JIT compiler, the one right after [we
+start using `dynasm`][previousJIT], while we were still using syscalls. This is because now
 when our compiled code will not have access to the rust functions (unless we
 compile them to a library and link them, as we will see later).
+
+[previousJIT]: {% post_url 2022-10-16-bf_compiler-part2 %}#improving-our-workflow-with-dynasm
 
 We also will need to make some changes. In our JIT compiler we were passing the
 program's memory as an argument to the compiled code, but we will not be able to
