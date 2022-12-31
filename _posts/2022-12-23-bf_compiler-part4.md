@@ -35,9 +35,9 @@ the [ELF] file format, which we will be exploring a little more in deep here.
 
 Another important piece of the compilation process are the object files, and the
 process of linking. Object files contain compiled code, but only part of the
-code that forms a program. They are used by compiler to split the source code
+code that forms a program. They are used by compilers to split the source code
 compilation (C compilers can compile each `.c` file to a separated object file),
-or for distributing precompiled libraries, for example. Again, each OS have its
+or for distributing precompiled libraries, for example. Again, each OS has its
 own object file format, which commonly uses the same format as executables, or
 executables use an extended version of them. On Linux, objects are also ELF files.
 
@@ -45,7 +45,7 @@ To link all these object files into a complete and executable program, you use a
 linker. Each object file has a list of symbols, that, among other things, are
 used to indicate what function the file define, and which ones they are using
 (that may be defined in another file). It also has a list of relocations, that
-are used to indicated which points in the memory need to be modified, and how,
+are used to indicate which points in the memory need to be modified, and how,
 to connect the object files. The linker is the program that read these files and
 does all these modifications, and outputs an executable.
 
@@ -81,9 +81,9 @@ _start:
     syscall              ; call the kernel
 ```
 
-In the code above we have two sections. Each section holds a chunk arbitrary
+In the code above we have two sections. Each section holds a chunk of arbitrary
 data. The sections can have any name, but the linker will map the section with
-the name `.data` to a segment that will have a read and write permissions when
+the name `.data` to a segment that will have read and write permissions when
 executed, and the `.text` to a segment with read and execute permissions.
 
 In the section `.data` we declared the string `'Hello World!\n'` (the 10 there
@@ -199,7 +199,7 @@ content is in the file. It may also be linked to another section (like `.symtab`
 has a link to the table that contains the symbol names).
 
 The readelf can pretty print the contents of some sections, as we will see in a
-moment, but you can also use `-x` to view they hex dump:
+moment, but you can also use `-x` to view the hex dump:
 
 ```shell
 $ readelf hello.o -x .shstrtab
@@ -380,13 +380,13 @@ section header of each section.
 
 ## A minimal hello world
 
-Again, is always good to start experimenting with an idea by implementing the
+Again, it's always good to start experimenting with an idea by implementing the
 simplest example that we can make. In our case that would be compiling a hello
 world program. But the one that I showed is still not minimal enough.
 
 Because our `'Hello World!\n'` string is only read during the execution, it does
 not need to live in a section with read and write permission like the `.data`.
-We could but it in a `.rodata`, which is read only, but we can take advantage
+We could put it in a `.rodata`, which is read only, but we can take advantage
 that the `.text` segment has read permission and put the string there, saving an
 entire section:
 
@@ -542,7 +542,7 @@ let start = obj.add_symbol(Symbol {
 We set its name; its kind, text, because it points to executable code; its
 scope, linkage, which make the symbol global, like we did in the assembly; it
 doesn't need to be weak (weak symbols can be overridden by non-weak symbols);
-and it will need any special flags.
+and it won't need any special flags.
 
 Value, size and section will be updated when we add data to the symbol, so I put
 some default values there for now.
@@ -636,9 +636,9 @@ that they are initially zeroed[^actually_is_zeroed].
     I cleared it anyway, because it will be useful when we port this compiler to
     Windows.
 
-Note that we are allocation a relative large value, 30000 bytes, but modern
+Note that we are allocating a relatively large value, 30000 bytes, but modern
 desktop systems have at least 1 MiB of reserved space for the stack, so that
-should not be as problem.
+should not be a problem.
 
 Another change is that we can no longer finish our program with a `ret`, because
 there is no one to return to. So we replace it with a `exit` syscall.
@@ -1046,7 +1046,7 @@ static linked to the Rust standard library, that in turn depends on some
 libraries provided by the OS.
 
 One way of fixing the error is by finding all libraries that define all the
-missing symbols, and add them as argument to the linker. This is kinda trick, I
+missing symbols, and add them as argument to the linker. This is kinda tricky, I
 am not even sure if this would work, and it will vary between Linux distros, so
 let's instead use `gcc` to link everything. It will already take care of linking
 all system libraries.
