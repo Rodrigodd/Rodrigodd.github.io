@@ -390,7 +390,7 @@ world program. But the one that I showed is still not minimal enough.
 Because our `'Hello World!\n'` string is only read during the execution, it does
 not need to live in a section with read and write permission like the `.data`.
 We could but it in a `.rodata`, which is read only, but we can take advantage
-that the `.text` segment has read permission and put the string there, saving a
+that the `.text` segment has read permission and put the string there, saving an
 entire section:
 
 ```nasm

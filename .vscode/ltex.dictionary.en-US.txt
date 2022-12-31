@@ -43,3 +43,6 @@ TODO
 readelf
 syscall
 LTO
+NASM
+ld
+rustc
