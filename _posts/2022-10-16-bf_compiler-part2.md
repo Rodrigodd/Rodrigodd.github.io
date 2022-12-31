@@ -11,14 +11,16 @@ Bendersky’s Adventures In JIT Compilation series][eli], but this time using th
 [eli]: https://eli.thegreenplace.net/2017/adventures-in-jit-compilation-part-1-an-interpreter
 [Rust]: https://www.rust-lang.org
 
-- [Part 1: An Optimized Interpreter]({% post_url 2022-10-16-bf_compiler-part1 %})
+- [Part 1: An Optimized Interpreter][part1]
 - **Part 2: A Singlepass JIT Compiler**
-- [Part 3: A Cranelift JIT Compiler]({% post_url 2022-11-21-bf_compiler-part3 %})
-- Part 4: A Static Compiler (WIP)
+- [Part 3: A Cranelift JIT Compiler][part3]
+- [Part 4: A Static Compiler]({% post_url 2022-12-23-bf_compiler-part4 %})
 
-In the [previous part]({% post_url 2022-10-16-bf_compiler-part1 %}) we made an
-optimized brainfuck interpreter. In this part we will make a brainfuck JIT
-compiler.
+[part1]: {% post_url 2022-10-16-bf_compiler-part1 %}
+[part3]: {% post_url 2022-11-21-bf_compiler-part3 %}
+
+In the [previous part][part1] we made an optimized brainfuck interpreter. In
+this part we will make a brainfuck JIT compiler.
 
 # The Interpreter Overhead
 
@@ -61,12 +63,12 @@ In this case, I used [cargo-show-asm] to get the x86 assembly for
     jmp rdi                             ; goto `jump`
 
 ; Increase (`+`)
-.LBB8_91:
+.LBB8_1:
     add byte ptr [r13 + rsi + 40], 1
     jmp .PROGRAM
 
 ; Decrease (`-`)
-.LBB8_90:
+.LBB8_0:
     add byte ptr [r13 + rsi + 40], -1
     jmp .PROGRAM
 
@@ -1465,17 +1467,23 @@ applying optimizations to the code.
 In fact, the optimizations applied by these projects are so good that they
 probably could automatically apply all the optimizations that we have come up.
 
-And this is exactly what we will explore in the next post in this series. The
-original series by Eli Bendersky have [made use of LLVM], but I follow a more
-Rusty approach and use [Cranelift] instead. Cranelift is a code generator
-written in Rust, and used by projects such as [Wasmtime] and
-[rustc_codegen_cranelift]. It does not apply a lot of optimizations, so maybe we
-don't get it be as fast as our optimized JIT implementation (we will see). But
-it does solve the problem of multiple architecture targeting, so I will at least
-be able to run our compiler on Android devices.
+And this is exactly what we will explore in [the next part][part3]. The original
+series by Eli Bendersky have [made use of LLVM], but I follow a more Rusty
+approach and use [Cranelift] instead. Cranelift is a code generator written in
+Rust, and used by projects such as [Wasmtime] and [rustc_codegen_cranelift]. It
+does not apply a lot of optimizations, so maybe we don't get it be as fast as
+our optimized JIT implementation (we will see). But it does solve the problem of
+multiple architecture targeting, so I will at least be able to run our compiler
+on Android devices.
 
 [made use of LLVM]: https://eli.thegreenplace.net/2017/adventures-in-jit-compilation-part-3-llvm/
 [Cranelift]: https://github.com/bytecodealliance/wasmtime/tree/main/cranelift
 
 [Wasmtime]: https://github.com/bytecodealliance/wasmtime/
 [rustc_codegen_cranelift]: https://github.com/bjorn3/rustc_codegen_cranelift
+
+
+All the code developed during these series [can be found here][the_code] (may
+not be exactly equal to one showed here).
+
+[the_code]: https://github.com/Rodrigodd/bf-compiler
