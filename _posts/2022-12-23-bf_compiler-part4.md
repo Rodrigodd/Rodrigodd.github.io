@@ -4,7 +4,7 @@ title:  "Compiling Brainfuck code - Part 4: A Static Compiler"
 date:   2022-12-31 16:50:00 -0300
 ---
 
-This is the third post of a blog post series where I reproduce [Eli Bendersky’s
+This is the fourth post of a blog post series where I reproduce [Eli Bendersky’s
 Adventures In JIT Compilation series][eli], but this time using the [Rust
 programming language][rust].
 
