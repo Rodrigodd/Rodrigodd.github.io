@@ -69,7 +69,7 @@ section .text
     global _start 
 
 _start:
-    mov rax, 1           ; 'write' system call = 4
+    mov rax, 1           ; 'write' system call = 1
     mov rdi, 1           ; file descriptor 1 = STDOUT
     mov rsi, hello       ; string to write
     mov rdx, helloLen    ; length of string to write
@@ -395,7 +395,7 @@ section .text
     global _start 
 
 _start:
-    mov rax, 1           ; 'write' system call = 4
+    mov rax, 1           ; 'write' system call = 1
     mov rdi, 1           ; file descriptor 1 = STDOUT
     lea rsi, [rel hello] ; string to write
     mov rdx, helloLen    ; length of string to write
@@ -463,7 +463,7 @@ let mut code: VecAssembler<X64Relocation> = VecAssembler::new(0);
 let hello_str = b"Hello world!\n";
 let len = hello_str.len() as i32;
 dynasm!(code
-    ; mov eax,1            // 'write' system call = 4
+    ; mov eax,1            // 'write' system call = 1
     ; mov edi,1            // file descriptor 1 = STDOUT
     ; lea rsi, [>hello]    // string to write
     ; mov edx, DWORD len   // length of string to write
@@ -889,7 +889,7 @@ my_write:
 
     mov rdx, rsi    ; length of string to write
     mov rsi, rdi    ; string to write
-    mov rax, 1      ; 'write' system call = 4
+    mov rax, 1      ; 'write' system call = 1
     mov rdi, 1      ; file descriptor 1 = STDOUT
     syscall         ; call the kernel
 
