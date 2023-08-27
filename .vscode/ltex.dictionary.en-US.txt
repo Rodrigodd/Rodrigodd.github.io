@@ -56,3 +56,4 @@ SameBoy
 Emulicious
 JitBoy
 recompilations
+VBlank

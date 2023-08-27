@@ -57,3 +57,8 @@
 {"rule":"ARTICLE_ADJECTIVE_OF","sentence":"^\\QThis is probably due to the optimizations achieved by implementing the lazy update and the estimative of the next interrupt.\\E$"}
 {"rule":"UPPERCASE_SENTENCE_START","sentence":"^\\Qbf_clift: {% post_url 2022-11-21-bf_compiler-part3 %}\\E$"}
 {"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\Qbf_clift: {% post_url 2022-11-21-bf_compiler-part3 %}\\E$"}
+{"rule":"MD_BASEFORM","sentence":"^\\QNot only might constantly checking for interrupts introduce a considerable amount of overhead, but we can no longer apply many of the optimizations that we would like to do, like the flag calculation omission, because the code need to always be prepared to branch to the interrupt handler.\\E$"}
+{"rule":"MD_BASEFORM","sentence":"^\\QNot only might constantly checking for interrupts introduce a considerable amount of overhead, but we can no longer apply many of the optimizations that we would like to do, like omitting calculation, because the code needs to always be prepared to branch to the interrupt handler.\\E$"}
+{"rule":"ENGLISH_WORD_REPEAT_RULE","sentence":"^\\QThe first game is The Legend of Zelda: Link's Awakening, and the second is Tobu Tobu Girl.\\E$"}
+{"rule":"ENGLISH_WORD_REPEAT_RULE","sentence":"^\\QHowever, when comparing the two implementations, it's possible to see that the JIT compiler decreases the execution time by about 40% in Tobu Tobu Girl and about 30% in Zelda.\\E$"}
+{"rule":"ENGLISH_WORD_REPEAT_RULE","sentence":"^\\QFor Tobu Tobu Girl, I let the intro run three times, and for Zelda, I let it run twice.\\E$"}
