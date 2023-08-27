@@ -46,3 +46,13 @@ LTO
 NASM
 ld
 rustc
+disassembler
+recompiler
+recompilers
+Reinspired
+Heisler
+NES
+SameBoy
+Emulicious
+JitBoy
+recompilations

@@ -45,3 +45,15 @@
 {"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QpreviousJIT: {% post_url 2022-10-16-bf_compiler-part2 %}#improving-our-workflow-with-dynasm\\E$"}
 {"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QWe also need to make sure to clear the memory, because brainfuck programs assume that they are initially zeroed^actually_is_zeroed.\\E$"}
 {"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\Q^actually_is_zeroed: Actually, on Linux, fresh allocated stack for a process is initially zeroed, and because we are the first function being executed (we are at the entry point) we can make sure that the memory is already clear.\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\Q^simplified_code: The actual code has a lot more abstraction, and do things like proper wrapping operations.\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QA very simplified^simplified_code code for the interpreter would be something like this:\\E$"}
+{"rule":"ENGLISH_WORD_REPEAT_RULE","sentence":"^\\QA very simplified^simplified_code code for the interpreter would be something like this:\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\QFor example, in the Game Boy, you can use the interrupt triggered by the VBlank of PPU (which happens right after the screen is fully rendered) to update the game logic and prepare the next frame for rendering.\\E$"}
+{"rule":"A_INFINITIVE","sentence":"^\\QThe same is true for bank switching: a write to ROM could switch the bank that the block is currently executing, so it needs to check if it did change and exit the block.\\E$"}
+{"rule":"ENGLISH_WORD_REPEAT_RULE","sentence":"^\\QThe first game is Zelda: Link's Awakening, and the second is Tobu Tobu Girl.\\E$"}
+{"rule":"ENGLISH_WORD_REPEAT_RULE","sentence":"^\\QThe emulator was capable of emulating Tobu Tobu Girl more than 100 times faster than the real system!\\E$"}
+{"rule":"ENGLISH_WORD_REPEAT_RULE","sentence":"^\\QBut comparing the two implementations, its is possible to see that the JIT compiler decreases the execution time by about 40% in Tobu Tobu Girl, and about 30% in Zelda.\\E$"}
+{"rule":"ENGLISH_WORD_REPEAT_RULE","sentence":"^\\QFor Tobu Tobu Girl, I let the intro run three times, and for the Zelda, I let it run twice.\\E$"}
+{"rule":"ARTICLE_ADJECTIVE_OF","sentence":"^\\QThis is probably due to the optimizations achieved by implementing the lazy update and the estimative of the next interrupt.\\E$"}
+{"rule":"UPPERCASE_SENTENCE_START","sentence":"^\\Qbf_clift: {% post_url 2022-11-21-bf_compiler-part3 %}\\E$"}
+{"rule":"MORFOLOGIK_RULE_EN_US","sentence":"^\\Qbf_clift: {% post_url 2022-11-21-bf_compiler-part3 %}\\E$"}
