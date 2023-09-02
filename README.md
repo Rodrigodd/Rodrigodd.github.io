@@ -1,4 +1,4 @@
-The source code for my blog: [rodrigodd.github.io](rodrigodd.github.io)
+The source code for my blog: [rodrigodd.github.io](https://rodrigodd.github.io/)
 
 # Running locally
 
