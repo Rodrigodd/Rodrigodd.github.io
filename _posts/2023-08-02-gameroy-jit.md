@@ -5,9 +5,9 @@ date:   2023-08-02 16:50:00 -0300
 ---
 
 Over the past two years, I have spent a lot of time working on my Game Boy
-emulator. It has reached a good point, where it has a GUI interface (including a
-debugger and disassembler), and passes numerous tests (comparable to some of the
-most accurate emulators).
+emulator, [GameRoy]. It has reached a good point, where it has a GUI interface (including a
+debugger and disassembler) and passes numerous tests (comparable to some of the
+most accurate emulators). I even made a port to Android!
 
 However, there's always been something that I wanted to do, even before
 developing this emulator: implementing a dynamic recompiler, also known as a JIT
@@ -596,11 +596,12 @@ encoding it in the F register bit flag, and then later decoding them in the
 branch instructions, where I could be using the value of each flag directly
 between instructions.
 
-But I will probably not implement these optimizations, at least not directly. I
-plan to instead write another backend for the compiler using
-[Cranelift][clift], which will likely automatically handle these
-optimizations and more. I have already [done some experiments with it
-before][bf_clift], and it seems to work pretty well.
+But I will probably not implement these optimizations, at least not directly.
+Instead, I plan to write another backend for the compiler using
+[Cranelift][clift], which will likely automatically handle these optimizations
+and more. I have already [done some experiments with it before][bf_clift], and
+it seems to work pretty well. It will also help with porting the JIT compiler to
+run on Android.
 
 [bf_clift]: {% post_url 2022-11-21-bf_compiler-part3 %}
 
