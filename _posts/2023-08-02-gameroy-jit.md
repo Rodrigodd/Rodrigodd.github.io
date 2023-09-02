@@ -1,7 +1,7 @@
 ---
 layout: post
-title:  "JIT compilation in a high accurate Game Boy emulator"
-date:   2023-08-02 16:50:00 -0300
+title:  "GameRoy: JIT compilation in High-Accuracy Game Boy Emulation"
+date:   2023-09-02 15:30:00 -0300
 ---
 
 Over the past two years, I have spent a lot of time working on my Game Boy
