@@ -625,7 +625,20 @@ given it too much thought yet.
 
 ## Conclusion
 
-And that's it! If you want to take a look at the emulator, I invite you to
-check out [its GitHub repository][gameroy].
+And that's it! I was not able to achieve the massive speed-up I was expecting,
+but I still managed to make my emulator the fastest one out there, even if the
+generated code is far from optimum.
 
-[gameroy]: https://github.com/Rodrigodd/gameroy
+I would like to thank Brook Heisler for his blog post, ["Experiments In NES JIT
+Compilation"][nes_jit], which inspired me to try this out, and gave me some
+useful links on how to implement a JIT compiler, like [Eli Bendersky’s
+Adventures In JIT Compilation series][eli_jit], which I [re-implemented in
+Rust][bf_part1] as a learning exercise.
+
+[eli_jit]: https://eli.thegreenplace.net/2017/adventures-in-jit-compilation-part-1-an-interpreter/
+[bf_part1]: {% post_url 2022-10-16-bf_compiler-part1 %}
+
+If you want to take a look at GameRoy, I invite you to check out [its GitHub
+repository][GameRoy].
+
+[GameRoy]: https://github.com/Rodrigodd/gameroy
