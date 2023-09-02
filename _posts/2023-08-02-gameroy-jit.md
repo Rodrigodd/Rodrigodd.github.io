@@ -112,7 +112,7 @@ needs to decode the same instruction multiple times.
 
 But that isn't a problem, at least not for the Game Boy, whose CPU runs at a
 clock speed of just a little over 1 MHz, while you might be reading this on
-a device with much more than 1 GHz. In fact, my emulator can run Game Boy games
+a device with much more than 1 GHz. In fact, GameRoy can run Game Boy games
 at over 60 times the original system's speed on my notebook with a 2.6 GHz
 Intel i5-4200U.
 
@@ -349,7 +349,7 @@ interrupt will happen.
 
 ## Estimating the next interrupt
 
-The JIT compiler in my emulator works this way: given the current address in the
+The JIT compiler in GameRoy works this way: given the current address in the
 PC register and the bank currently mapped to that address, the compiler produces
 a block of instructions starting at that address. This block is then compiled
 down into machine code, and stored in a cache.
@@ -571,7 +571,7 @@ enough to compare them with each other.
 
 ![Emulator comparison](/assets/gameroy_jit/emulator-comparison.svg)
 
-Based on these results, I can now claim that my emulator is the fastest one out
+Based on these results, I can now claim that GameRoy is the fastest emulator out
 there! Interestingly, even the interpreted version of my emulator is faster than
 most of the other emulators. This is likely due to the optimizations achieved by
 implementing the lazy updates and estimating the next interrupt.
