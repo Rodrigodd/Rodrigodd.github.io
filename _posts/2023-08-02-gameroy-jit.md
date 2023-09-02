@@ -69,11 +69,7 @@ implements the instruction's execution. This function reads and writes to
 registers or memory, reading additional bytes from the instructions when
 necessary (e.g., for immediate values, like the address of jump instructions).
 
-[^simplified_code]: The actual code has a lot more abstraction, and do things
-    like proper wrapping operations.
-
-A very simplified[^simplified_code] code for the interpreter would be something
-like this:
+A very simplified for the interpreter would be something like this:
 
 ```rust
 fn interpret_instruction(gb: &mut GameBoy) {
