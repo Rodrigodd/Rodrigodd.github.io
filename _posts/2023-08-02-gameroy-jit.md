@@ -162,8 +162,8 @@ fn inc_b(_: &mut JitCompiler, code: &mut Vec<u8>) {
         0xfe, 0xc1,             // inc    cl                     ; increase B
         0x88, 0x4f, 0x02,       // mov    BYTE PTR [rdi+0x2],cl  ; write B
         0x24, 0x1f,             // and    al,0x1f                ; clear Z, N, H flags
-        0x8d, 0x50, 0x80,       // lea    edx,[rax-0x80]
-        0x0f, 0xb6, 0xc0,       // movzx  eax,al
+        0x8d, 0x50, 0x80,       // lea    edx,[rax-0x80]         ; calculate the flags...
+        0x0f, 0xb6, 0xc0,       // movzx  eax,al                 ; ...
         0x0f, 0xb6, 0xd2,       // movzx  edx,dl
         0x0f, 0x45, 0xd0,       // cmovne edx,eax
         0x8d, 0x42, 0x20,       // lea    eax,[rdx+0x20]
@@ -239,8 +239,8 @@ fn inc_b(ctx: &mut JitCompiler, code: &mut Vec<u8>) {
         0xfe, 0xc1,             // inc    cl                     ; increase B
         0x88, 0x4f, 0x02,       // mov    BYTE PTR [rdi+0x2],cl  ; write B
         0x24, 0x1f,             // and    al,0x1f                ; clear Z, N, H flags
-        0x8d, 0x50, 0x80,       // lea    edx,[rax-0x80]
-        0x0f, 0xb6, 0xc0,       // movzx  eax,al
+        0x8d, 0x50, 0x80,       // lea    edx,[rax-0x80]         ; calculate the flags...
+        0x0f, 0xb6, 0xc0,       // movzx  eax,al                 ; ...
         0x0f, 0xb6, 0xd2,       // movzx  edx,dl
         0x0f, 0x45, 0xd0,       // cmovne edx,eax
         0x8d, 0x42, 0x20,       // lea    eax,[rdx+0x20]
