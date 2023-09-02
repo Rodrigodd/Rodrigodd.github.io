@@ -556,6 +556,13 @@ of accuracy: [SameBoy][sameboy], [BGB][bgb], [Beaten Dying Moon][bdm], and
 [bdm]: https://mattcurrie.com/bdm/
 [emulicious]: https://emulicious.net/
 
+You can have a feel for how accurate each emulator is by seeing the test results
+in daid's [GBEmulatorShootout]. Noticed that these test included DMG, GBC, and
+SGB version of the Game Boy, but GameRoy only emulates DMG, so it appears a
+little behind the others.
+
+[GBEmulatorShootout]: https://daid.github.io/GBEmulatorShootout/
+
 To measure the performance of each emulator, I ran the same two games as before,
 and measured the time it took to run the intro animation of each game, using
 a video recorded with [OBS Studio][obs]. For Tobu Tobu Girl, I let the intro run
