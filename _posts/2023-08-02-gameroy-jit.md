@@ -9,6 +9,8 @@ emulator, [GameRoy]. It has reached a good point, where it has a GUI interface (
 debugger and disassembler) and passes numerous tests (comparable to some of the
 most accurate emulators). I even made a port to Android!
 
+![GameRoy running on Android](/assets/gameroy_jit/gameroy.png)
+
 However, there's always been something that I wanted to do, even before
 developing this emulator: implementing a dynamic recompiler, also known as a JIT
 compiler. Since the first time I researched how an emulator works, one of
