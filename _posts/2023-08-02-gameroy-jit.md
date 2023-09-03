@@ -62,7 +62,7 @@ Game Boy is an 8-bit system) from the memory address pointed by the program
 counter (PC), incrementing the PC after each read. To decode the
 instruction only the first byte is needed for most instructions. Since there are
 only 255 possible values for a byte, we can use a look-up table. The Game
-Boy CPU also haves 0xCB prefixed instructions that are decoded from the second
+Boy CPU also has 0xCB prefixed instructions that are decoded from the second
 byte, using another look-up table.
 
 I am using Rust for my emulator implementation, so I can use a `match` statement
@@ -71,7 +71,7 @@ implements the instruction's execution. This function reads and writes to
 registers or memory, reading additional bytes from the instructions when
 necessary (e.g., for immediate values, like the address of jump instructions).
 
-A very simplified for the interpreter would be something like this:
+A very simplified interpreter would be something like this:
 
 ```rust
 fn interpret_instruction(gb: &mut GameBoy) {
@@ -178,7 +178,7 @@ fn inc_b(_: &mut JitCompiler, code: &mut Vec<u8>) {
 ```
 
 This `compile_instruction` function reads and decodes an instruction, and then
-write the machine code that executes that instruction to a buffer.
+writes the machine code that executes that instruction to a buffer.
 
 _(For the curious, I got that assembly/machine code by simply [implementing the
 instruction in Rust][inc_b_playground], and then disassembling it with `objdump
@@ -211,12 +211,12 @@ the array of raw bytes that I presented here.
 ## Optimizations
 
 The cool thing about compiling code is that you can do optimizations! For
-example, one of the (few) optimizations that I make in the JIT compiler for my
+example, one of the (few) optimizations that I made in the JIT compiler for my
 emulator is the omission of unnecessary flag calculations (directly inspired by
 the one described in [Brook Heisler's post][nes_jit]).
 
 If you tried to read what the assembly code is doing, you may have noticed that
-only instructions are used to increment the value of register B, and the
+only four instructions are used to increment the value of register B, and the
 remaining 10 are being used to update the conditional flags in the register
 F. But the value of F may be overwritten by the next instructions before it
 could be read from a conditional jump instruction for example. In that scenario,
@@ -269,7 +269,7 @@ But my emulator is, at least for now, only targeting `x86-64` machine code. So
 I will refrain from using any of them.
 
 But there is a big problem in trying to apply any non-trivial optimization, even
-the simple flag omission one: the fact that the CPU need to handle interrupts.
+the simple flag omission one: the fact that the CPU needs to handle interrupts.
 
 ## Interrupts
 
