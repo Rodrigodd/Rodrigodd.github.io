@@ -2,6 +2,7 @@
 layout: post
 title:  "GameRoy: JIT compilation in High-Accuracy Game Boy Emulation"
 date:   2023-09-02 15:30:00 -0300
+modified_date:   2023-09-09 16:30:00 -0300
 ---
 
 Over the past two years, I have spent a lot of time working on my Game Boy
@@ -578,13 +579,20 @@ enough to compare them with each other.
 
 ![Emulator comparison](/assets/gameroy_jit/emulator-comparison.svg)
 
-Based on these results, I can now claim that GameRoy is the fastest emulator out
+_Unfortunately, these measures are misrepresenting the performance of the emulators.
+At least in the case of BGB, I didn't notice that the framerate in fast forward was
+capped at just 10 times the normal speed. [Thanks u/turbobutton for letting me know](turbobutton).
+I will redo the measurements and update this section_
+
+[turbobutton]: https://www.reddit.com/r/EmuDev/comments/168b7xa/comment/jz3e9r0/?utm_source=share&utm_medium=web2x&context=3
+
+~Based on these results, I can now claim that GameRoy is the fastest emulator out
 there! Interestingly, even the interpreted version of my emulator is faster than
 most of the other emulators. This is likely due to the optimizations achieved by
-implementing the lazy updates and estimating the next interrupt.
+implementing the lazy updates and estimating the next interrupt.~
 
-Only Emulicious was faster than my interpreted emulator when running Zelda
-(perhaps my emulator is invalidating the PPU optimization too much).
+~Only Emulicious was faster than my interpreted emulator when running Zelda
+(perhaps my emulator is invalidating the PPU optimization too much).~
 
 ## Remaining work
 
