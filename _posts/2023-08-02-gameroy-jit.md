@@ -2,7 +2,7 @@
 layout: post
 title:  "GameRoy: JIT compilation in High-Accuracy Game Boy Emulation"
 date:   2023-09-02 15:30:00 -0300
-modified_date:   2023-09-09 16:30:00 -0300
+modified_date:   2023-09-10 17:00:00 -0300
 ---
 
 Over the past two years, I have spent a lot of time working on my Game Boy
@@ -518,7 +518,7 @@ emulator.
 [zelda]: https://en.wikipedia.org/wiki/The_Legend_of_Zelda:_Link%27s_Awakening
 [tobu]: https://tangramgames.dk/tobutobugirl/
 
-![Emulator comparison](/assets/gameroy_jit/interpreter-vs-jit.svg)
+![Interpreter vs JIT](/assets/gameroy_jit/interpreter-vs-jit.svg)
 
 The emulator was capable of emulating Tobu Tobu Girl more than 100 times faster
 than the real system! However, when comparing the two implementations, it's
@@ -534,7 +534,7 @@ passing it to my [plot script][plot], I can generate the following pie charts:
 [inferno]: https://github.com/jonhoo/inferno
 [plot]: https://github.com/Rodrigodd/gameroy/blob/4ac46fff3a203c20aadbb108585354701a52546e/tools/plot.py
 
-![Interpreter time](/assets/gameroy_jit/per-component-inter-vs-jit.svg)
+![Timing spend per component](/assets/gameroy_jit/per-component-inter-vs-jit.svg)
 
 From the pie chart above, we can see that a big chunk of the time is spent
 emulating the PPU. We can also see that Zelda has a lot less opportunities for
@@ -548,21 +548,29 @@ the `HashMap`. And even with the JIT compiler, some time is still spent in the
 interpreter.
 
 Another aspect we can explore is comparing the emulator with others out
-there. I picked 4 emulators that are relatively popular and have a high degree
-of accuracy: [SameBoy][sameboy], [BGB][bgb], [Beaten Dying Moon][bdm], and
-[Emulicious][emulicious].
+there. I picked 5 emulators that are relatively popular and have a high degree
+of accuracy: [SameBoy][sameboy], [BGB][bgb], [Beaten Dying Moon][bdm],
+[Emulicious][emulicious] and [Gambatte-Speedrun][gambatte-speedrun].
 
 [sameboy]: https://sameboy.github.io/
 [bgb]: http://bgb.bircd.org/
 [bdm]: https://mattcurrie.com/bdm/
 [emulicious]: https://emulicious.net/
+[gambatte-speedrun]: https://github.com/pokemon-speedrunning/gambatte-speedrun
 
-You can have a feel for how accurate each emulator is by seeing the test results
-in daid's [GBEmulatorShootout]. Noticed that these test included DMG, GBC, and
-SGB version of the Game Boy, but GameRoy only emulates DMG, so it appears a
+You can get a feel for how accurate each emulator is by viewing the test results
+in daid's [GBEmulatorShootout]. Notice that these tests include DMG, GBC, and
+SGB versions of the Game Boy, but GameRoy only emulates DMG, so it appears a
 little behind the others.
 
 [GBEmulatorShootout]: https://daid.github.io/GBEmulatorShootout/
+
+The emulators were run on Windows, with their default GUI frontend, configured
+to emulate DMG and with "turbo mode" or "fast forward" or whatever it is called
+enabled. Due to the use of a GUI frontend, the measurement being based on video
+recording, and the intro being run only two or three times, the results are not
+that precise. But hopefully they are good enough to compare them with each
+other.
 
 To measure the performance of each emulator, I ran the same two games as before,
 and measured the time it took to run the intro animation of each game, using
@@ -571,28 +579,54 @@ three times, and for Zelda, I let it run twice.
 
 [obs]: https://obsproject.com/
 
-The emulators were run on Windows, with their default GUI frontend, configure to
-emulate DMG and with "turbo mode" enabled. Due to the use of a GUI frontend, the
-measurement being based on video recording, and the intro being run only two or
-three times, the results are not that precise. But hopefully they are good
-enough to compare them with each other.
+An important point is that both BGB and Gambatte (at least, I'm not sure if the
+others do something similar) have optimizations that skip the rendering of some
+frames of the LCD, which is something that I haven't implemented yet in my
+emulator. That optimization can be disabled in BGB, so I included it in the
+benchmarks to have a more direct performance comparison. For Gambatte it is
+not possible to disable it[^gambatte-options].
+
+[^gambatte-options]: Another point is that the frameskip in Gambatte, unlike
+    BGB, is not dynamic. You need to provide a fixed number of frames to skip,
+    and the unskipped frames are still emulated at a maximum of 60 frames per
+    second. I configured the frameskip to 75[^gambatte-turbo], which made the
+    GUI lag a littke (hopefully, this means it is running at maximum speed), but
+    be aware that this choice is arbitrary and may not be optimal.
+
+[^gambatte-turbo]: The emulator has a hard cap of 16 in the frameskip
+    configuration, but I modified the source code to disable that limit.
+
+Here are the results[^raw-data]:
+
+[^raw-data]: You can also see the [raw data collected here](https://docs.google.com/spreadsheets/d/1jrf2O9iv1QbqRu0Hown5LX2dKIk7RecZ-SZrNFdJL7I/edit?usp=sharing).
 
 ![Emulator comparison](/assets/gameroy_jit/emulator-comparison.svg)
 
-_Unfortunately, these measures are misrepresenting the performance of the emulators.
-At least in the case of BGB, I didn't notice that the framerate in fast forward was
-capped at just 10 times the normal speed. [Thanks u/turbobutton for letting me know](turbobutton).
-I will redo the measurements and update this section_
+Based on these results (and if you ignore the emulators that do frameskip
+optimization and the lack of rigor in the benchmark), I can somewhat claim that
+GameRoy is the fastest emulator!
 
-[turbobutton]: https://www.reddit.com/r/EmuDev/comments/168b7xa/comment/jz3e9r0/?utm_source=share&utm_medium=web2x&context=3
+Interestingly, even the interpreted version of my emulator is faster than most
+of the other emulators when running Tobu Tobu Girl. This is likely due to the
+PPU optimization achieved by implementing lazy updates and estimating the next
+interrupt, as The Legend of Zelda emulation speed is still comparable to the
+other emulators and it less affected by PPU optimization.
 
-~Based on these results, I can now claim that GameRoy is the fastest emulator out
-there! Interestingly, even the interpreted version of my emulator is faster than
-most of the other emulators. This is likely due to the optimizations achieved by
-implementing the lazy updates and estimating the next interrupt.~
+But both Gambatte and BGB with frameskip optimization are a lot faster than
+GameRoy. BGB is more than 5 times faster than its non-optimized version (which
+is closer to the 4 times speed-up that I got with PPU optimization in the
+Interpreter version of GameRoy) and is more than 2 times faster than GameRoy.
 
-~Only Emulicious was faster than my interpreted emulator when running Zelda
-(perhaps my emulator is invalidating the PPU optimization too much).~
+If I implement the frameskip optimization, somehow eliminating the entire time
+spent in the PPU, my emulator would become about 2 times faster than it is now,
+which still would not be enough to beat BGB. So the claim that GameRoy is the
+fastest emulator may be a little exaggerated.
+
+_Errata: The emulator benchmarks included in the first published version of this
+blog post were using an older version of GameRoy, didn't include Gambatte, and
+were running BGB with its maximum speed capped at 10x. In that scenario, I had
+claimed that GameRoy was the fastest emulator by far. I hope I have fixed it
+now._
 
 ## Remaining work
 
