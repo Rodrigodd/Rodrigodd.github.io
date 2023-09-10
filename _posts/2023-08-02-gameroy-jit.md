@@ -597,6 +597,7 @@ not possible to disable it[^gambatte-options].
     configuration, but I modified the source code to disable that limit.
 
 Here are the results[^raw-data]:
+{: #emulator-comparison}
 
 [^raw-data]: You can also see the [raw data collected here](https://docs.google.com/spreadsheets/d/1jrf2O9iv1QbqRu0Hown5LX2dKIk7RecZ-SZrNFdJL7I/edit?usp=sharing).
 
