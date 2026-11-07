@@ -1,0 +1,11 @@
+title = "Rodrigodd"
+description = ""
+# The base URL of the site, without a trailing slash.
+url = "https://rodrigodd.github.io"
+date_format = "%b %-d, %Y"
+# Number of posts in feed.xml (jekyll-feed's default).
+feed_limit = 10
+
+[[social_links]]
+platform = "github"
+user_url = "https://github.com/Rodrigodd/Rodrigodd.github.io"

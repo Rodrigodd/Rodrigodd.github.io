@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}<article class="post h-entry" itemscope itemtype="http://schema.org/BlogPosting">
+
+  <header class="post-header">
+    <h1 class="post-title p-name" itemprop="name headline">{{ page.title }}</h1>
+    <p class="post-meta"><time class="dt-published" datetime="{{ page.date }}" itemprop="datePublished">
+        {{ page.date|date(site.date_format) }}
+      </time>
+      {%- if page.modified_date %}<span style="margin-left: 0.3em; margin-right: 0.3em"> • </span>
+        Updated<time class="dt-modified" datetime="{{ page.modified_date }}" itemprop="dateModified">
+          {{ page.modified_date|date(site.date_format) }}
+        </time>
+      {%- endif %}<span style="margin-left: 0.3em; margin-right: 0.3em"> • </span>
+
+    <span class="ert">
+      {{ page.reading_time }} minute{% if page.reading_time != 1 %}s{% endif %} read
+    </span>
+
+    </p>
+  </header>
+
+  <div class="post-content e-content" itemprop="articleBody">
+    {{ page.content|safe }}
+  </div>
+
+  <a class="u-url" href="{{ page.url }}" hidden></a>
+</article>
+{% endblock %}

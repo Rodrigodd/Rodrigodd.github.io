@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}<div class="home">
+  {%- if page.title %}
+  <h1 class="page-heading">{{ page.title }}</h1>
+  {%- endif %}
+  {{ page.content|safe }}
+
+  {%- if posts %}
+  <ul class="post-list">
+    {%- for post in posts %}<li>
+        <span class="post-meta">{{ post.date|date(site.date_format) }}</span>
+        <h3>
+          <a class="post-link" href="{{ post.url }}">
+            {{ post.title }}
+          </a>
+        </h3></li>
+    {%- endfor %}</ul>
+  {%- endif %}
+
+</div>
+{% endblock %}

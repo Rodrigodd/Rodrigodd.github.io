@@ -1,0 +1,1503 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1"><!-- Begin Jekyll SEO tag v2.8.0 -->
+<title>Compiling Brainfuck code - Part 4: A Static Compiler | Rodrigodd</title>
+<meta name="generator" content="Jekyll v3.9.3" />
+<meta property="og:title" content="Compiling Brainfuck code - Part 4: A Static Compiler" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="This is the fourth post of a blog post series where I reproduce Eli Bendersky’s Adventures In JIT Compilation series, but this time using the Rust programming language." />
+<meta property="og:description" content="This is the fourth post of a blog post series where I reproduce Eli Bendersky’s Adventures In JIT Compilation series, but this time using the Rust programming language." />
+<link rel="canonical" href="https://rodrigodd.github.io/2022/12/31/bf_compiler-part4.html" />
+<meta property="og:url" content="https://rodrigodd.github.io/2022/12/31/bf_compiler-part4.html" />
+<meta property="og:site_name" content="Rodrigodd" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2022-12-31T19:50:00+00:00" />
+<meta name="twitter:card" content="summary" />
+<meta property="twitter:title" content="Compiling Brainfuck code - Part 4: A Static Compiler" />
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","dateModified":"2022-12-31T19:50:00+00:00","datePublished":"2022-12-31T19:50:00+00:00","description":"This is the fourth post of a blog post series where I reproduce Eli Bendersky’s Adventures In JIT Compilation series, but this time using the Rust programming language.","headline":"Compiling Brainfuck code - Part 4: A Static Compiler","mainEntityOfPage":{"@type":"WebPage","@id":"https://rodrigodd.github.io/2022/12/31/bf_compiler-part4.html"},"url":"https://rodrigodd.github.io/2022/12/31/bf_compiler-part4.html"}</script>
+<!-- End Jekyll SEO tag -->
+<link rel="stylesheet" href="/assets/css/style.css"><link type="application/atom+xml" rel="alternate" href="https://rodrigodd.github.io/feed.xml" title="Rodrigodd" />
+</head>
+<body><header class="site-header">
+
+  <div class="wrapper"><a class="site-title" rel="author" href="/">Rodrigodd</a><nav class="site-nav">
+        <input type="checkbox" id="nav-trigger" class="nav-trigger" />
+        <label for="nav-trigger">
+          <span class="menu-icon">
+            <svg viewBox="0 0 18 15" width="18px" height="15px">
+              <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.032C17.335,0,18,0.665,18,1.484L18,1.484z M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.032C17.335,6.031,18,6.696,18,7.516L18,7.516z M18,13.516C18,14.335,17.335,15,16.516,15H1.484 C0.665,15,0,14.335,0,13.516l0,0c0-0.82,0.665-1.483,1.484-1.483h15.032C17.335,12.031,18,12.695,18,13.516L18,13.516z"/>
+            </svg>
+          </span>
+        </label>
+
+        <div class="trigger"><a class="page-link" href="/about.html">About</a></div>
+      </nav></div>
+</header>
+<main class="page-content" aria-label="Content">
+      <div class="wrapper">
+        <article class="post h-entry" itemscope itemtype="http://schema.org/BlogPosting">
+
+  <header class="post-header">
+    <h1 class="post-title p-name" itemprop="name headline">Compiling Brainfuck code - Part 4: A Static Compiler</h1>
+    <p class="post-meta"><time class="dt-published" datetime="2022-12-31T19:50:00+00:00" itemprop="datePublished">
+        Dec 31, 2022
+      </time><span style="margin-left: 0.3em; margin-right: 0.3em"> • </span>
+
+    <span class="ert">
+      
+      
+      
+      
+
+      
+      
+      
+
+      
+      20 minutes read
+    </span>
+
+    </p>
+  </header>
+
+  <div class="post-content e-content" itemprop="articleBody">
+    <p>This is the fourth post of a blog post series where I reproduce <a href="https://eli.thegreenplace.net/2017/adventures-in-jit-compilation-part-1-an-interpreter">Eli Bendersky’s
+Adventures In JIT Compilation series</a>, but this time using the <a href="https://www.rust-lang.org">Rust
+programming language</a>.</p>
+
+<ul>
+  <li><a href="/2022/10/21/bf_compiler-part1.html">Part 1: An Optimized Interpreter</a></li>
+  <li><a href="/2022/11/07/bf_compiler-part2.html">Part 2: A Singlepass JIT Compiler</a></li>
+  <li><a href="/2022/11/26/bf_compiler-part3.html">Part 3: A Cranelift JIT Compiler</a></li>
+  <li><strong>Part 4: A Static Compiler</strong></li>
+</ul>
+
+<p>In this final part we will use the compiled code that we generated in the
+previous parts, and learn how to put them in an executable file, achieving a
+static compiler.</p>
+<h1 id="executable-files-and-object-files">
+  
+  
+    Executable files and Object Files&nbsp<a href="#executable-files-and-object-files" class="anchor">§</a>
+  
+  
+</h1>
+    
+
+<p>To build a static compiler, we need to be able to save our generated assembly in
+a file, in a way that the operating system can execute.</p>
+
+<p>Each OS have its own executable file format. On Windows, executable files are in
+the <a href="https://learn.microsoft.com/en-us/windows/win32/debug/pe-format">PE</a> file format, on macOS in the <a href="https://github.com/apple-oss-distributions/xnu/blob/xnu-8792.61.2/EXTERNAL_HEADERS/mach-o/loader.h">Mach-O</a>. On Linux, executable files are in
+the <a href="https://man7.org/linux/man-pages/man5/elf.5.html">ELF</a> file format, which we will be exploring a little more in deep here.</p>
+
+<p>Another important piece of the compilation process are the object files, and the
+process of linking. Object files contain compiled code, but only part of the
+code that forms a program. They are used by compilers to split the source code
+compilation (C compilers can compile each <code class="language-plaintext highlighter-rouge">.c</code> file to a separated object file),
+or for distributing precompiled libraries, for example. Again, each OS has its
+own object file format, which commonly uses the same format as executables, or
+executables use an extended version of them. On Linux, objects are also ELF files.</p>
+
+<p>To link all these object files into a complete and executable program, you use a
+linker. Each object file has a list of symbols, that, among other things, are
+used to indicate what function the file define, and which ones they are using
+(that may be defined in another file). It also has a list of relocations, that
+are used to indicate which points in the memory need to be modified, and how,
+to connect the object files. The linker is the program that read these files and
+does all these modifications, and outputs an executable.</p>
+
+<p>We will see more practical examples of this further down.</p>
+<h1 id="exploring-elf-files">
+  
+  
+    Exploring ELF files&nbsp<a href="#exploring-elf-files" class="anchor">§</a>
+  
+  
+</h1>
+    
+
+<p>As always, we will start by making a compiler for the simplest program that we
+can achieve. In the previous parts we were using the <code class="language-plaintext highlighter-rouge">add1</code> function as example,
+but that don’t make into an interesting enough program. So let’s make a good old
+“hello world” program.</p>
+
+<p>On Linux x86-64 assembly, it would be:</p>
+
+<div class="language-nasm highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nf">section</span> <span class="nv">.data</span>
+    <span class="nl">hello:</span>    <span class="kd">db</span> <span class="s">'Hello world!'</span><span class="p">,</span><span class="mi">10</span>
+    <span class="nl">helloLen:</span> <span class="nf">equ</span> <span class="kc">$</span><span class="o">-</span><span class="nv">hello</span>
+
+<span class="nf">section</span> <span class="nv">.text</span>
+    <span class="nf">global</span> <span class="nv">_start</span> 
+
+<span class="nl">_start:</span>
+    <span class="nf">mov</span> <span class="nb">rax</span><span class="p">,</span> <span class="mi">1</span>           <span class="c1">; 'write' system call = 1</span>
+    <span class="nf">mov</span> <span class="nb">rdi</span><span class="p">,</span> <span class="mi">1</span>           <span class="c1">; file descriptor 1 = STDOUT</span>
+    <span class="nf">mov</span> <span class="nb">rsi</span><span class="p">,</span> <span class="nv">hello</span>       <span class="c1">; string to write</span>
+    <span class="nf">mov</span> <span class="nb">rdx</span><span class="p">,</span> <span class="nv">helloLen</span>    <span class="c1">; length of string to write</span>
+    <span class="nf">syscall</span>              <span class="c1">; call the kernel</span>
+
+    <span class="c1">; Terminate program</span>
+    <span class="nf">mov</span> <span class="nb">rax</span><span class="p">,</span> <span class="mi">60</span>          <span class="c1">; 'exit' system call = 60</span>
+    <span class="nf">mov</span> <span class="nb">rdi</span><span class="p">,</span> <span class="mi">0</span>           <span class="c1">; exit with error code 0</span>
+    <span class="nf">syscall</span>              <span class="c1">; call the kernel</span>
+</code></pre></div></div>
+
+<p>In the code above we have two sections. Each section holds a chunk of arbitrary
+data. The sections can have any name, but the linker will map the section with
+the name <code class="language-plaintext highlighter-rouge">.data</code> to a segment that will have read and write permissions when
+executed, and the <code class="language-plaintext highlighter-rouge">.text</code> to a segment with read and execute permissions.</p>
+
+<p>In the section <code class="language-plaintext highlighter-rouge">.data</code> we declared the string <code class="language-plaintext highlighter-rouge">'Hello World!\n'</code> (the 10 there
+is the ASCII code for line-break) with the label <code class="language-plaintext highlighter-rouge">hello</code>, and a constant for the
+string length (compute by taking the current address (<code class="language-plaintext highlighter-rouge">$</code>) minus the <code class="language-plaintext highlighter-rouge">hello</code>
+address).</p>
+
+<p>And in the section <code class="language-plaintext highlighter-rouge">.text</code> we declare that the label <code class="language-plaintext highlighter-rouge">_start</code> is global (meaning
+that other objects can see it), and declaring it preceding the code for printing
+the string (using the ‘write’ syscall) and exiting (with the ‘exit’ syscall).</p>
+
+<p>Every label above will map to a symbol in the object file, that later will be
+used for applying relocations, debug purposes, etcetera. The <code class="language-plaintext highlighter-rouge">_start</code> symbol in
+specific will be used by the linker to tell where is the entry point of our
+executable (and that is why it must be global).</p>
+
+<p>To assemble and link the program, we can use the assembler <a href="https://www.nasm.us/">NASM</a> and the linker
+<a href="https://man7.org/linux/man-pages/man1/ld.1.html">ld</a>:</p>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>nasm hello.as <span class="nt">-f</span> elf64 <span class="nt">-o</span> hello.o
+<span class="nv">$ </span>ld hello.o <span class="nt">-o</span> hello
+</code></pre></div></div>
+
+<p>And running it:</p>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>./hello
+Hello World!
+</code></pre></div></div>
+
+<p>It works!</p>
+
+<p>Now, let’s take a close look in the object file and the executable file. For
+this, we can use the <a href="https://man7.org/linux/man-pages/man1/readelf.1.html">readelf</a> utility. You can use the <code class="language-plaintext highlighter-rouge">-a</code> flag to show in one
+go all the information that I will be explaining, but I will go in parts here.</p>
+
+<p>First, lake take a look at the <code class="language-plaintext highlighter-rouge">hello.o</code> object file:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ readelf hello.o -h
+ELF Header:
+  Magic:   7f 45 4c 46 02 01 01 00 00 00 00 00 00 00 00 00
+  Class:                             ELF64
+  Data:                              2's complement, little endian
+  Version:                           1 (current)
+  OS/ABI:                            UNIX - System V
+  ABI Version:                       0
+  Type:                              REL (Relocatable file)
+  Machine:                           Advanced Micro Devices X86-64
+  Version:                           0x1
+  Entry point address:               0x0
+  Start of program headers:          0 (bytes into file)
+  Start of section headers:          64 (bytes into file)
+  Flags:                             0x0
+  Size of this header:               64 (bytes)
+  Size of program headers:           0 (bytes)
+  Number of program headers:         0
+  Size of section headers:           64 (bytes)
+  Number of section headers:         7
+  Section header string table index: 3
+</code></pre></div></div>
+
+<p>First we have the ELF header, with basic information like version, ABI, etc. It
+also contains the location in the file of the program headers (only relevant for
+executable files) and the section headers.</p>
+
+<p>You may want to take a look on <a href="https://man7.org/linux/man-pages/man5/elf.5.html">the man page for the ELF format</a> to see in
+more detail what each field in the header means, and also for the parts below.</p>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>readelf hello.o <span class="nt">-S</span>
+There are 7 section headers, starting at offset 0x40:
+
+Section Headers:
+  <span class="o">[</span>Nr] Name              Type             Address           Offset
+       Size              EntSize          Flags  Link  Info  Align
+  <span class="o">[</span> 0]                   NULL             0000000000000000  00000000
+       0000000000000000  0000000000000000           0     0     0
+  <span class="o">[</span> 1] .data             PROGBITS         0000000000000000  00000200
+       000000000000000d  0000000000000000  WA       0     0     4
+  <span class="o">[</span> 2] .text             PROGBITS         0000000000000000  00000210
+       0000000000000027  0000000000000000  AX       0     0     16
+  <span class="o">[</span> 3] .shstrtab         STRTAB           0000000000000000  00000240
+       0000000000000032  0000000000000000           0     0     1
+  <span class="o">[</span> 4] .symtab           SYMTAB           0000000000000000  00000280
+       00000000000000a8  0000000000000018           5     6     8
+  <span class="o">[</span> 5] .strtab           STRTAB           0000000000000000  00000330
+       0000000000000020  0000000000000000           0     0     1
+  <span class="o">[</span> 6] .rela.text        RELA             0000000000000000  00000350
+       0000000000000018  0000000000000018           4     2     8
+Key to Flags:
+  W <span class="o">(</span>write<span class="o">)</span>, A <span class="o">(</span>alloc<span class="o">)</span>, X <span class="o">(</span>execute<span class="o">)</span>, M <span class="o">(</span>merge<span class="o">)</span>, S <span class="o">(</span>strings<span class="o">)</span>, I <span class="o">(</span>info<span class="o">)</span>,
+  L <span class="o">(</span><span class="nb">link </span>order<span class="o">)</span>, O <span class="o">(</span>extra OS processing required<span class="o">)</span>, G <span class="o">(</span>group<span class="o">)</span>, T <span class="o">(</span>TLS<span class="o">)</span>,
+  C <span class="o">(</span>compressed<span class="o">)</span>, x <span class="o">(</span>unknown<span class="o">)</span>, o <span class="o">(</span>OS specific<span class="o">)</span>, E <span class="o">(</span>exclude<span class="o">)</span>,
+  l <span class="o">(</span>large<span class="o">)</span>, p <span class="o">(</span>processor specific<span class="o">)</span>
+</code></pre></div></div>
+
+<p>Following it, we have the section headers. The first header is always a null
+one. Here we can see that we have the headers for the <code class="language-plaintext highlighter-rouge">.data</code> and <code class="language-plaintext highlighter-rouge">.text</code>
+sections that we have written in our assembly code. But we also have some other
+sections that hold, respectively, the strings for the name of the sections
+headers, the symbols, the string for the symbol names and such, and lastly the
+relocations for the .text section.</p>
+
+<p>Each section header tells some information about the section, like where its
+content is in the file. It may also be linked to another section (like <code class="language-plaintext highlighter-rouge">.symtab</code>
+has a link to the table that contains the symbol names).</p>
+
+<p>The readelf can pretty print the contents of some sections, as we will see in a
+moment, but you can also use <code class="language-plaintext highlighter-rouge">-x</code> to view the hex dump:</p>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>readelf hello.o <span class="nt">-x</span> .shstrtab
+
+Hex dump of section <span class="s1">'.shstrtab'</span>:
+  0x00000000 002e6461 7461002e 74657874 002e7368 ..data..text..sh
+  0x00000010 73747274 6162002e 73796d74 6162002e strtab..symtab..
+  0x00000020 73747274 6162002e 72656c61 2e746578 strtab..rela.tex
+  0x00000030 7400                                t.
+</code></pre></div></div>
+
+<p>Here for example we can see that the section “section header string table” is a
+list of null byte terminated strings, with the first string being empty.</p>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>readelf hello.o <span class="nt">-s</span>
+
+Symbol table <span class="s1">'.symtab'</span> contains 7 entries:
+   Num:    Value          Size Type    Bind   Vis      Ndx Name
+     0: 0000000000000000     0 NOTYPE  LOCAL  DEFAULT  UND
+     1: 0000000000000000     0 FILE    LOCAL  DEFAULT  ABS hello.as
+     2: 0000000000000000     0 SECTION LOCAL  DEFAULT    1
+     3: 0000000000000000     0 SECTION LOCAL  DEFAULT    2
+     4: 0000000000000000     0 NOTYPE  LOCAL  DEFAULT    1 hello
+     5: 000000000000000d     0 NOTYPE  LOCAL  DEFAULT  ABS helloLen
+     6: 0000000000000000     0 NOTYPE  GLOBAL DEFAULT    2 _start
+</code></pre></div></div>
+
+<p>With <code class="language-plaintext highlighter-rouge">-s</code> we can see the symbol table. The first one is always null. There are
+the symbols that we defined in our assembly, and some others introduced by the
+assembler like the file name and symbols for each section (used for relocation).</p>
+
+<p>Each symbol contains a value. In the case of <code class="language-plaintext highlighter-rouge">hello</code> and <code class="language-plaintext highlighter-rouge">start</code> it is the
+address of the symbol in its respective section (both are at the start of the
+section, so they are 0) and in <code class="language-plaintext highlighter-rouge">helloLen</code> is the length of the string.</p>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>readelf hello.o <span class="nt">-r</span>
+
+Relocation section <span class="s1">'.rela.text'</span> at offset 0x350 contains 1 entry:
+  Offset          Info           Type           Sym. Value    Sym. Name + Addend
+00000000000c  000200000001 R_X86_64_64       0000000000000000 .data + 0
+</code></pre></div></div>
+
+<p>And lastly we have the relocations. Here we have only a single one for the
+<code class="language-plaintext highlighter-rouge">.text</code> section that applies at offset <code class="language-plaintext highlighter-rouge">0xc</code>, use the symbol 2 (the first 2
+bytes of info) on the linked section (<code class="language-plaintext highlighter-rouge">.symtab</code>), is of type <code class="language-plaintext highlighter-rouge">R_X86_64_64</code> (each
+processor has its own set of relocation types) and has an addend of 0. This
+means that it replaces a 64bit word at <code class="language-plaintext highlighter-rouge">0xc</code> by the value of the symbol <code class="language-plaintext highlighter-rouge">.data</code>.</p>
+
+<p>If we look at the disassembly of the machine code, we can see that in offset
+<code class="language-plaintext highlighter-rouge">0xc</code> we have the last 8 bytes of the <code class="language-plaintext highlighter-rouge">movabs</code> instruction, the one that loads
+the address of the <code class="language-plaintext highlighter-rouge">hello</code> string:</p>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>objdump <span class="nt">-d</span> <span class="nt">-M</span> intel hello.o
+
+hello.o:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000000000000 &lt;_start&gt;:
+   0:   b8 01 00 00 00          mov    eax,0x1
+   5:   bf 01 00 00 00          mov    edi,0x1
+   a:   48 be 00 00 00 00 00    movabs rsi,0x0
+  11:   00 00 00
+  14:   ba 0d 00 00 00          mov    edx,0xd
+  19:   0f 05                   syscall
+  1b:   b8 3c 00 00 00          mov    eax,0x3c
+  20:   bf 00 00 00 00          mov    edi,0x0
+  25:   0f 05                   syscall
+</code></pre></div></div>
+
+<p>This means that during linking, after the linker have set the location in memory
+that the <code class="language-plaintext highlighter-rouge">data</code> section should be loaded, it will path that instruction to the
+correct address of the <code class="language-plaintext highlighter-rouge">hello</code> string.</p>
+
+<p>And we can see all this in action, by inspecting the <code class="language-plaintext highlighter-rouge">./hello</code> executable file:</p>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>readelf hello <span class="nt">-S</span>
+There are 6 section headers, starting at offset 0x2158:
+
+Section Headers:
+  <span class="o">[</span>Nr] Name              Type             Address           Offset
+       Size              EntSize          Flags  Link  Info  Align
+  <span class="o">[</span> 0]                   NULL             0000000000000000  00000000
+       0000000000000000  0000000000000000           0     0     0
+  <span class="o">[</span> 1] .text             PROGBITS         0000000000401000  00001000
+       0000000000000027  0000000000000000  AX       0     0     16
+  <span class="o">[</span> 2] .data             PROGBITS         0000000000402000  00002000
+       000000000000000d  0000000000000000  WA       0     0     4
+  <span class="o">[</span> 3] .symtab           SYMTAB           0000000000000000  00002010
+       00000000000000f0  0000000000000018           4     6     8
+  <span class="o">[</span> 4] .strtab           STRTAB           0000000000000000  00002100
+       0000000000000031  0000000000000000           0     0     1
+  <span class="o">[</span> 5] .shstrtab         STRTAB           0000000000000000  00002131
+       0000000000000027  0000000000000000           0     0     1
+Key to Flags:
+  W <span class="o">(</span>write<span class="o">)</span>, A <span class="o">(</span>alloc<span class="o">)</span>, X <span class="o">(</span>execute<span class="o">)</span>, M <span class="o">(</span>merge<span class="o">)</span>, S <span class="o">(</span>strings<span class="o">)</span>, I <span class="o">(</span>info<span class="o">)</span>,
+  L <span class="o">(</span><span class="nb">link </span>order<span class="o">)</span>, O <span class="o">(</span>extra OS processing required<span class="o">)</span>, G <span class="o">(</span>group<span class="o">)</span>, T <span class="o">(</span>TLS<span class="o">)</span>,
+  C <span class="o">(</span>compressed<span class="o">)</span>, x <span class="o">(</span>unknown<span class="o">)</span>, o <span class="o">(</span>OS specific<span class="o">)</span>, E <span class="o">(</span>exclude<span class="o">)</span>,
+  l <span class="o">(</span>large<span class="o">)</span>, p <span class="o">(</span>processor specific<span class="o">)</span>
+</code></pre></div></div>
+
+<p>Here we can see that the address of the <code class="language-plaintext highlighter-rouge">.text</code> and <code class="language-plaintext highlighter-rouge">.data</code> sections have been
+set up to 0x401000 and 0x402000. Now if we take a look in the disassembly:</p>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>objdump <span class="nt">-d</span> <span class="nt">-M</span> intel hello
+
+hello:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000000401000 &lt;_start&gt;:
+  401000:       b8 01 00 00 00          mov    eax,0x1
+  401005:       bf 01 00 00 00          mov    edi,0x1
+  40100a:       48 be 00 20 40 00 00    movabs rsi,0x402000
+  401011:       00 00 00
+  401014:       ba 0d 00 00 00          mov    edx,0xd
+  401019:       0f 05                   syscall
+  40101b:       b8 3c 00 00 00          mov    eax,0x3c
+  401020:       bf 00 00 00 00          mov    edi,0x0
+  401025:       0f 05                   syscall
+</code></pre></div></div>
+
+<p>Look! The address in the <code class="language-plaintext highlighter-rouge">movabs</code> instruction, at offset <code class="language-plaintext highlighter-rouge">0xc</code> was updated
+to <code class="language-plaintext highlighter-rouge">0x402000</code> (in little endian)!.</p>
+
+<p>Another thing you may notice if you run <code class="language-plaintext highlighter-rouge">readelf hello -a</code> is that it now
+contains a program header table:</p>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>readelf hello <span class="nt">-l</span>
+
+Elf file <span class="nb">type </span>is EXEC <span class="o">(</span>Executable file<span class="o">)</span>
+Entry point 0x401000
+There are 3 program headers, starting at offset 64
+
+Program Headers:
+  Type           Offset             VirtAddr           PhysAddr
+                 FileSiz            MemSiz              Flags  Align
+  LOAD           0x0000000000000000 0x0000000000400000 0x0000000000400000
+                 0x00000000000000e8 0x00000000000000e8  R      0x1000
+  LOAD           0x0000000000001000 0x0000000000401000 0x0000000000401000
+                 0x0000000000000027 0x0000000000000027  R E    0x1000
+  LOAD           0x0000000000002000 0x0000000000402000 0x0000000000402000
+                 0x000000000000000d 0x000000000000000d  RW     0x1000
+
+ Section to Segment mapping:
+  Segment Sections...
+   00
+   01     .text
+   02     .data
+</code></pre></div></div>
+
+<p>A program header contains information about things that the system need to
+prepared for the program execution. Here we have three headers of type <code class="language-plaintext highlighter-rouge">LOAD</code>
+that tells which segments of the file need to be loaded in memory.</p>
+
+<p>The first one tells to load 232 (<code class="language-plaintext highlighter-rouge">0xe8</code>) bytes starting at offset 0 of the file
+(that is, the ELF header and program headers) with read permissions in virtual
+address <code class="language-plaintext highlighter-rouge">0x40_0000</code> (or physical address <code class="language-plaintext highlighter-rouge">0x40_0000</code> but most PCs today uses
+<a href="https://en.wikipedia.org/wiki/Virtual_memory">virtual memory</a>). (I am not sure why the ELF header is loaded in memory.)</p>
+
+<p>The second one loads the <code class="language-plaintext highlighter-rouge">.text</code> section, with read and exec permissions, and
+the third loads <code class="language-plaintext highlighter-rouge">.data</code> with read and write permissions.</p>
+
+<p>The program headers themselves don’t say which sections they are mapping
+(although readelf shows the mapping), but you can check this yourself by
+comparing the offset and address of the segments here, with the ones in the
+section header of each section.</p>
+<h2 id="a-minimal-hello-world">
+  
+  
+    A minimal hello world&nbsp<a href="#a-minimal-hello-world" class="anchor">§</a>
+  
+  
+</h2>
+    
+
+<p>Again, it’s always good to start experimenting with an idea by implementing the
+simplest example that we can make. In our case that would be compiling a hello
+world program. But the one that I showed is still not minimal enough.</p>
+
+<p>Because our <code class="language-plaintext highlighter-rouge">'Hello World!\n'</code> string is only read during the execution, it does
+not need to live in a section with read and write permission like the <code class="language-plaintext highlighter-rouge">.data</code>.
+We could put it in a <code class="language-plaintext highlighter-rouge">.rodata</code>, which is read only, but we can take advantage
+that the <code class="language-plaintext highlighter-rouge">.text</code> segment has read permission and put the string there, saving an
+entire section:</p>
+
+<div class="language-nasm highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nf">section</span> <span class="nv">.text</span>
+    <span class="nf">global</span> <span class="nv">_start</span> 
+
+<span class="nl">_start:</span>
+    <span class="nf">mov</span> <span class="nb">rax</span><span class="p">,</span> <span class="mi">1</span>           <span class="c1">; 'write' system call = 1</span>
+    <span class="nf">mov</span> <span class="nb">rdi</span><span class="p">,</span> <span class="mi">1</span>           <span class="c1">; file descriptor 1 = STDOUT</span>
+    <span class="nf">lea</span> <span class="nb">rsi</span><span class="p">,</span> <span class="p">[</span><span class="nv">rel</span> <span class="nv">hello</span><span class="p">]</span> <span class="c1">; string to write</span>
+    <span class="nf">mov</span> <span class="nb">rdx</span><span class="p">,</span> <span class="nv">helloLen</span>    <span class="c1">; length of string to write</span>
+    <span class="nf">syscall</span>              <span class="c1">; call the kernel</span>
+
+    <span class="c1">; Terminate program</span>
+    <span class="nf">mov</span> <span class="nb">rax</span><span class="p">,</span> <span class="mi">60</span>          <span class="c1">; 'exit' system call = 60</span>
+    <span class="nf">mov</span> <span class="nb">rdi</span><span class="p">,</span> <span class="mi">0</span>           <span class="c1">; exit with error code 0</span>
+    <span class="nf">syscall</span>              <span class="c1">; call the kernel</span>
+    <span class="nl">hello:</span>    <span class="kd">db</span> <span class="s">'Hello world!'</span><span class="p">,</span><span class="mi">10</span>
+    <span class="nl">helloLen:</span> <span class="nf">equ</span> <span class="kc">$</span><span class="o">-</span><span class="nv">hello</span>
+</code></pre></div></div>
+
+<p>And by putting the string alongside the code, we can make sure the string is
+always at a constant offset from the code. This means that I could replace the
+<code class="language-plaintext highlighter-rouge">mov</code> of the absolute address of <code class="language-plaintext highlighter-rouge">hello</code> in the code, by a <code class="language-plaintext highlighter-rouge">lea rsi, [rel
+hello]</code> rip relative addressing, saving a relocation!</p>
+
+<p>If you take a look at the disassembly now, you will see that that instruction is
+compiled down to <code class="language-plaintext highlighter-rouge">lea rsi, [rip+0x13]</code>:</p>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>nasm hello.as <span class="nt">-f</span> elf64 <span class="nt">-o</span> hello.o
+<span class="nv">$ </span>objdump <span class="nt">-d</span> <span class="nt">-M</span> intel hello.o
+
+hello.o:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000000000000 &lt;_start&gt;:
+   0:   b8 01 00 00 00          mov    eax,0x1
+   5:   bf 01 00 00 00          mov    edi,0x1
+   a:   48 8d 35 13 00 00 00    lea    rsi,[rip+0x13]        <span class="c"># 24 &lt;hello&gt;</span>
+  11:   ba 0d 00 00 00          mov    edx,0xd
+  16:   0f 05                   syscall
+  18:   b8 3c 00 00 00          mov    eax,0x3c
+  1d:   bf 00 00 00 00          mov    edi,0x0
+  22:   0f 05                   syscall
+
+0000000000000024 &lt;hello&gt;:
+  24:   48                      rex.W
+  25:   65 6c                   gs ins BYTE PTR es:[rdi],dx
+  27:   6c                      ins    BYTE PTR es:[rdi],dx
+  28:   6f                      outs   dx,DWORD PTR ds:[rsi]
+  29:   20 77 6f                and    BYTE PTR <span class="o">[</span>rdi+0x6f],dh
+  2c:   72 6c                   jb     9a &lt;hello+0x76&gt;
+  2e:   64 21 0a                and    DWORD PTR fs:[rdx],ecx
+</code></pre></div></div>
+
+<p>(Also, these strange instruction are there only because objdump is trying to
+interpret the string data as code now.)</p>
+<h1 id="the-object-crate">
+  
+  
+    The object crate&nbsp<a href="#the-object-crate" class="anchor">§</a>
+  
+  
+</h1>
+    
+
+<p>Now we can finally start making a small compiler. First, lets use <a href="https://docs.rs/dynasmrt/1.2.3/dynasmrt/index.html">dynasm</a>, like
+we did in part two, to get our hello world program in Rust:</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">let</span> <span class="k">mut</span> <span class="n">code</span><span class="p">:</span> <span class="n">VecAssembler</span><span class="o">&lt;</span><span class="n">X64Relocation</span><span class="o">&gt;</span> <span class="o">=</span> <span class="nn">VecAssembler</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
+
+<span class="k">let</span> <span class="n">hello_str</span> <span class="o">=</span> <span class="n">b</span><span class="s">"Hello world!</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
+<span class="k">let</span> <span class="n">len</span> <span class="o">=</span> <span class="n">hello_str</span><span class="nf">.len</span><span class="p">()</span> <span class="k">as</span> <span class="nb">i32</span><span class="p">;</span>
+<span class="nd">dynasm!</span><span class="p">(</span><span class="n">code</span>
+    <span class="p">;</span> <span class="n">mov</span> <span class="n">eax</span><span class="p">,</span><span class="mi">1</span>            <span class="c">// 'write' system call = 1</span>
+    <span class="p">;</span> <span class="n">mov</span> <span class="n">edi</span><span class="p">,</span><span class="mi">1</span>            <span class="c">// file descriptor 1 = STDOUT</span>
+    <span class="p">;</span> <span class="n">lea</span> <span class="n">rsi</span><span class="p">,</span> <span class="p">[</span><span class="o">&gt;</span><span class="n">hello</span><span class="p">]</span>    <span class="c">// string to write</span>
+    <span class="p">;</span> <span class="n">mov</span> <span class="n">edx</span><span class="p">,</span> <span class="n">DWORD</span> <span class="n">len</span>   <span class="c">// length of string to write</span>
+    <span class="p">;</span> <span class="n">syscall</span>              <span class="c">// call the kernel</span>
+
+    <span class="c">// Terminate program</span>
+    <span class="p">;</span> <span class="n">mov</span> <span class="n">eax</span><span class="p">,</span><span class="mi">60</span>           <span class="c">// 'exit' system call</span>
+    <span class="p">;</span> <span class="n">mov</span> <span class="n">edi</span><span class="p">,</span><span class="mi">0</span>            <span class="c">// exit with error code 0</span>
+    <span class="p">;</span> <span class="n">syscall</span>              <span class="c">// call the kernel</span>
+    <span class="p">;</span> <span class="n">hello</span><span class="p">:</span>
+    <span class="p">;</span> <span class="py">.bytes</span> <span class="n">hello_str</span>
+<span class="p">);</span>
+
+<span class="k">let</span> <span class="n">code</span> <span class="o">=</span> <span class="n">code</span><span class="nf">.finalize</span><span class="p">()</span><span class="nf">.unwrap</span><span class="p">();</span>
+</code></pre></div></div>
+
+<p>We can directly run that code using <a href="https://docs.rs/memmap2/0.5.8/memmap2/index.html">memmap2</a>, to make sure everything is
+working:</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">let</span> <span class="k">mut</span> <span class="n">buffer</span> <span class="o">=</span> <span class="nn">memmap2</span><span class="p">::</span><span class="nn">MmapOptions</span><span class="p">::</span><span class="nf">new</span><span class="p">()</span>
+    <span class="nf">.len</span><span class="p">(</span><span class="n">code</span><span class="nf">.len</span><span class="p">())</span>
+    <span class="nf">.map_anon</span><span class="p">()</span>
+    <span class="nf">.unwrap</span><span class="p">();</span>
+
+<span class="n">buffer</span><span class="nf">.copy_from_slice</span><span class="p">(</span><span class="n">code</span><span class="nf">.as_slice</span><span class="p">());</span>
+
+<span class="k">let</span> <span class="n">buffer</span> <span class="o">=</span> <span class="n">buffer</span><span class="nf">.make_exec</span><span class="p">()</span><span class="nf">.unwrap</span><span class="p">();</span>
+
+<span class="k">let</span> <span class="n">hello</span><span class="p">:</span> <span class="k">unsafe</span> <span class="k">extern</span> <span class="s">"C"</span> <span class="k">fn</span><span class="p">()</span> <span class="k">-&gt;</span> <span class="o">!</span> <span class="o">=</span> <span class="nn">std</span><span class="p">::</span><span class="nn">mem</span><span class="p">::</span><span class="nf">transmute</span><span class="p">(</span><span class="n">buffer</span><span class="nf">.as_ptr</span><span class="p">());</span>
+<span class="nf">hello</span><span class="p">()</span>
+</code></pre></div></div>
+
+<p>If you run this, it will print <code class="language-plaintext highlighter-rouge">Hello World!</code>.</p>
+
+<p>But we should be compiling it to an object file. For this we will use the
+<a href="https://docs.rs/object/0.30.0/object/index.html"><code class="language-plaintext highlighter-rouge">object</code></a> crate. As its docs says, “the <code class="language-plaintext highlighter-rouge">object</code> crate provides a unified
+interface to working with objects files across platforms”.</p>
+
+<p>This crate will allow us to write our object files, without needing to worry
+about the details of each object format, making it easier to make our compiler
+cross-platform. It also allows writing ELF and PE executables directly, but we
+would need to use its lower level API for each format, so we will not cover that
+here.</p>
+
+<p>So first we crate a <code class="language-plaintext highlighter-rouge">Object</code> struct with the specification of our host:</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">let</span> <span class="k">mut</span> <span class="n">obj</span> <span class="o">=</span> <span class="nn">object</span><span class="p">::</span><span class="nn">write</span><span class="p">::</span><span class="nn">Object</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span>
+    <span class="nn">object</span><span class="p">::</span><span class="nn">BinaryFormat</span><span class="p">::</span><span class="n">Elf</span><span class="p">,</span>
+    <span class="nn">object</span><span class="p">::</span><span class="nn">Architecture</span><span class="p">::</span><span class="n">X86_64</span><span class="p">,</span>
+    <span class="nn">object</span><span class="p">::</span><span class="nn">Endianness</span><span class="p">::</span><span class="n">Little</span><span class="p">,</span>
+<span class="p">);</span>
+</code></pre></div></div>
+
+<p>Next we can add the <code class="language-plaintext highlighter-rouge">_start</code> symbol to the object:</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">let</span> <span class="n">start</span> <span class="o">=</span> <span class="n">obj</span><span class="nf">.add_symbol</span><span class="p">(</span><span class="n">Symbol</span> <span class="p">{</span>
+    <span class="n">name</span><span class="p">:</span> <span class="n">b</span><span class="s">"_start"</span><span class="nf">.to_vec</span><span class="p">(),</span>
+    <span class="n">kind</span><span class="p">:</span> <span class="nn">object</span><span class="p">::</span><span class="nn">SymbolKind</span><span class="p">::</span><span class="n">Text</span><span class="p">,</span>
+    <span class="n">scope</span><span class="p">:</span> <span class="nn">object</span><span class="p">::</span><span class="nn">SymbolScope</span><span class="p">::</span><span class="n">Linkage</span><span class="p">,</span>
+    <span class="n">weak</span><span class="p">:</span> <span class="k">false</span><span class="p">,</span>
+    <span class="n">flags</span><span class="p">:</span> <span class="nn">SymbolFlags</span><span class="p">::</span><span class="nb">None</span><span class="p">,</span>
+
+    <span class="n">value</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="n">size</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="n">section</span><span class="p">:</span> <span class="nn">object</span><span class="p">::</span><span class="nn">write</span><span class="p">::</span><span class="nn">SymbolSection</span><span class="p">::</span><span class="n">Undefined</span><span class="p">,</span>
+<span class="p">});</span>
+</code></pre></div></div>
+
+<p>We set its name; its kind, text, because it points to executable code; its
+scope, linkage, which make the symbol global, like we did in the assembly; it
+doesn’t need to be weak (weak symbols can be overridden by non-weak symbols);
+and it won’t need any special flags.</p>
+
+<p>Value, size and section will be updated when we add data to the symbol, so I put
+some default values there for now.</p>
+
+<p>Now we can crate the <code class="language-plaintext highlighter-rouge">.text</code> section, and by calling <code class="language-plaintext highlighter-rouge">add_symbol_data</code> we append
+our code to it and at same time we update the <code class="language-plaintext highlighter-rouge">_start</code> symbol.
+x86 instructions don’t need to be aligned, so the alignment is 1.</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">let</span> <span class="n">text</span> <span class="o">=</span> <span class="n">obj</span><span class="nf">.section_id</span><span class="p">(</span><span class="nn">object</span><span class="p">::</span><span class="nn">write</span><span class="p">::</span><span class="nn">StandardSection</span><span class="p">::</span><span class="n">Text</span><span class="p">);</span>
+<span class="n">obj</span><span class="nf">.add_symbol_data</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">text</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">code</span><span class="p">,</span> <span class="mi">1</span><span class="p">);</span>
+</code></pre></div></div>
+
+<p>And that is it! Now we can emit it, and save it to a file!</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">let</span> <span class="k">mut</span> <span class="n">out</span> <span class="o">=</span> <span class="nn">Vec</span><span class="p">::</span><span class="nf">new</span><span class="p">();</span>
+<span class="n">obj</span><span class="nf">.emit</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span> <span class="n">out</span><span class="p">)</span><span class="nf">.unwrap</span><span class="p">();</span>
+
+<span class="nn">std</span><span class="p">::</span><span class="nn">fs</span><span class="p">::</span><span class="nf">write</span><span class="p">(</span><span class="s">"hello.o"</span><span class="p">,</span> <span class="n">out</span><span class="p">)</span><span class="nf">.unwrap</span><span class="p">();</span>
+</code></pre></div></div>
+
+<p>If we take a look at the object generated, we see that everything is as we
+expected:</p>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>readelf <span class="nt">-Srs</span> hello.o
+There are 5 section headers, starting at offset 0xd8:
+
+Section Headers:
+  <span class="o">[</span>Nr] Name              Type             Address           Offset
+       Size              EntSize          Flags  Link  Info  Align
+  <span class="o">[</span> 0]                   NULL             0000000000000000  00000000
+       0000000000000000  0000000000000000           0     0     0
+  <span class="o">[</span> 1] .text             PROGBITS         0000000000000000  00000040
+       0000000000000031  0000000000000000  AX       0     0     1
+  <span class="o">[</span> 2] .symtab           SYMTAB           0000000000000000  00000078
+       0000000000000030  0000000000000018           3     1     8
+  <span class="o">[</span> 3] .strtab           STRTAB           0000000000000000  000000a8
+       0000000000000008  0000000000000000           0     0     1
+  <span class="o">[</span> 4] .shstrtab         STRTAB           0000000000000000  000000b0
+       0000000000000021  0000000000000000           0     0     1
+Key to Flags:
+  W <span class="o">(</span>write<span class="o">)</span>, A <span class="o">(</span>alloc<span class="o">)</span>, X <span class="o">(</span>execute<span class="o">)</span>, M <span class="o">(</span>merge<span class="o">)</span>, S <span class="o">(</span>strings<span class="o">)</span>, I <span class="o">(</span>info<span class="o">)</span>,
+  L <span class="o">(</span><span class="nb">link </span>order<span class="o">)</span>, O <span class="o">(</span>extra OS processing required<span class="o">)</span>, G <span class="o">(</span>group<span class="o">)</span>, T <span class="o">(</span>TLS<span class="o">)</span>,
+  C <span class="o">(</span>compressed<span class="o">)</span>, x <span class="o">(</span>unknown<span class="o">)</span>, o <span class="o">(</span>OS specific<span class="o">)</span>, E <span class="o">(</span>exclude<span class="o">)</span>,
+  l <span class="o">(</span>large<span class="o">)</span>, p <span class="o">(</span>processor specific<span class="o">)</span>
+
+There are no relocations <span class="k">in </span>this file.
+
+Symbol table <span class="s1">'.symtab'</span> contains 2 entries:
+   Num:    Value          Size Type    Bind   Vis      Ndx Name
+     0: 0000000000000000     0 NOTYPE  LOCAL  DEFAULT  UND
+     1: 0000000000000000    49 FUNC    GLOBAL HIDDEN     1 _start
+</code></pre></div></div>
+
+<p>Now let’s link and run it:</p>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>ld hello.o <span class="nt">-o</span> hello
+<span class="nv">$ </span>./hello
+Hello world!
+</code></pre></div></div>
+
+<p>It works!</p>
+<h1 id="a-zero-dependency-static-compiler">
+  
+  
+    A zero-dependency Static Compiler&nbsp<a href="#a-zero-dependency-static-compiler" class="anchor">§</a>
+  
+  
+</h1>
+    
+
+<p>Now we know everything necessary to make the first version of our brainfuck
+compiler!</p>
+
+<p>First, I will take an old version of our JIT compiler, the one right after <a href="/2022/11/07/bf_compiler-part2.html#improving-our-workflow-with-dynasm">we
+start using <code class="language-plaintext highlighter-rouge">dynasm</code></a>, while we were still using syscalls. This is
+because now our compiled code will not have access to Rust functions (unless
+we compile them to a library and link them, as we will see later).</p>
+
+<p>We also will need to make some changes. In our JIT compiler we were passing the
+program’s memory as an argument to the compiled code, but we will not be able to
+do this anymore. So instead we will allocate that memory on the stack.</p>
+
+<p>To allocate memory from the stack is very easy, we only need to decrease the
+value <code class="language-plaintext highlighter-rouge">rsp</code> by how much memory we need to allocate (the stack grows downwards).
+We also need to make sure to clear the memory, because brainfuck programs assume
+that they are initially zeroed<sup id="fnref:actually_is_zeroed" role="doc-noteref"><a href="#fn:actually_is_zeroed" class="footnote" rel="footnote">1</a></sup>.</p>
+
+<p>Note that we are allocating a relatively large value, 30000 bytes, but modern
+desktop systems have at least 1 MiB of reserved space for the stack, so that
+should not be a problem.</p>
+
+<p>Another change is that we can no longer finish our program with a <code class="language-plaintext highlighter-rouge">ret</code>, because
+there is no one to return to. So we replace it with a <code class="language-plaintext highlighter-rouge">exit</code> syscall.</p>
+
+<p>So here is what the code becomes:</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">struct</span> <span class="n">Program</span> <span class="p">{</span>
+    <span class="n">code</span><span class="p">:</span> <span class="nb">Vec</span><span class="o">&lt;</span><span class="nb">u8</span><span class="o">&gt;</span><span class="p">,</span>
+<span class="p">}</span>
+<span class="k">impl</span> <span class="n">Program</span> <span class="p">{</span>
+    <span class="k">fn</span> <span class="nf">new</span><span class="p">(</span><span class="n">source</span><span class="p">:</span> <span class="o">&amp;</span><span class="p">[</span><span class="nb">u8</span><span class="p">])</span> <span class="k">-&gt;</span> <span class="n">Result</span><span class="o">&lt;</span><span class="n">Program</span><span class="p">,</span> <span class="n">UnbalancedBrackets</span><span class="o">&gt;</span> <span class="p">{</span>
+        <span class="k">let</span> <span class="k">mut</span> <span class="n">code</span><span class="p">:</span> <span class="n">VecAssembler</span><span class="o">&lt;</span><span class="n">X64Relocation</span><span class="o">&gt;</span> <span class="o">=</span> <span class="nn">VecAssembler</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
+
+        <span class="c">// r12 will be the adress of `memory`</span>
+        <span class="c">// r13 will be the value of `pointer`</span>
+        <span class="c">// r13 is set to 0</span>
+        <span class="nd">dynasm!</span> <span class="p">{</span> <span class="n">code</span>
+            <span class="p">;</span> <span class="py">.arch</span> <span class="n">x64</span>
+            <span class="p">;</span> <span class="n">push</span> <span class="n">rbp</span>
+            <span class="p">;</span> <span class="n">mov</span> <span class="n">rbp</span><span class="p">,</span> <span class="n">rsp</span>
+            <span class="p">;</span> <span class="n">xor</span> <span class="n">r13</span><span class="p">,</span> <span class="n">r13</span>
+
+            <span class="c">// allocate 30_0000 bytes on stack for the memory</span>
+            <span class="p">;</span> <span class="n">sub</span> <span class="n">rsp</span><span class="p">,</span> <span class="mi">30_000</span>
+            <span class="p">;</span> <span class="n">mov</span> <span class="n">r12</span><span class="p">,</span> <span class="n">rsp</span>
+
+            <span class="c">// zero the memory</span>
+            <span class="p">;</span> <span class="n">xor</span> <span class="n">eax</span><span class="p">,</span> <span class="n">eax</span>
+            <span class="p">;</span> <span class="n">mov</span> <span class="n">r11</span><span class="p">,</span> <span class="n">r12</span>
+            <span class="p">;</span> <span class="n">loop_</span><span class="p">:</span>
+            <span class="p">;</span> <span class="n">mov</span> <span class="n">QWORD</span> <span class="p">[</span><span class="n">r11</span><span class="p">],</span> <span class="n">rax</span>
+            <span class="p">;</span> <span class="n">add</span> <span class="n">r11</span><span class="p">,</span> <span class="mi">8</span>
+            <span class="p">;</span> <span class="n">cmp</span> <span class="n">r11</span><span class="p">,</span> <span class="n">rbp</span>
+            <span class="p">;</span> <span class="n">jne</span> <span class="o">&lt;</span><span class="n">loop_</span>
+        <span class="p">};</span>
+
+        <span class="k">let</span> <span class="k">mut</span> <span class="n">bracket_stack</span> <span class="o">=</span> <span class="nn">Vec</span><span class="p">::</span><span class="nf">new</span><span class="p">();</span>
+
+        <span class="k">for</span> <span class="n">b</span> <span class="n">in</span> <span class="n">source</span> <span class="p">{</span>
+            <span class="k">match</span> <span class="n">b</span> <span class="p">{</span>
+                <span class="n">b</span><span class="sc">'+'</span> <span class="k">=&gt;</span> <span class="nd">dynasm!</span> <span class="p">{</span> <span class="n">code</span>
+                    <span class="p">;</span> <span class="py">.arch</span> <span class="n">x64</span>
+                    <span class="p">;</span> <span class="n">add</span> <span class="n">BYTE</span> <span class="p">[</span><span class="n">r12</span> <span class="o">+</span> <span class="n">r13</span><span class="p">],</span> <span class="mi">1</span>
+                <span class="p">},</span>
+                <span class="n">b</span><span class="sc">'-'</span> <span class="k">=&gt;</span> <span class="nd">dynasm!</span> <span class="p">{</span> <span class="n">code</span>
+                    <span class="p">;</span> <span class="py">.arch</span> <span class="n">x64</span>
+                    <span class="p">;</span> <span class="n">add</span> <span class="n">BYTE</span> <span class="p">[</span><span class="n">r12</span> <span class="o">+</span> <span class="n">r13</span><span class="p">],</span> <span class="o">-</span><span class="mi">1</span>
+                <span class="p">},</span>
+                <span class="n">b</span><span class="sc">'.'</span> <span class="k">=&gt;</span> <span class="nd">dynasm!</span> <span class="p">{</span> <span class="n">code</span>
+                    <span class="p">;</span> <span class="py">.arch</span> <span class="n">x64</span>
+                    <span class="p">;</span> <span class="n">mov</span> <span class="n">rax</span><span class="p">,</span> <span class="mi">1</span>           <span class="c">// write syscall</span>
+                    <span class="p">;</span> <span class="n">mov</span> <span class="n">rdi</span><span class="p">,</span> <span class="mi">1</span>           <span class="c">// stdout's file descriptor</span>
+                    <span class="p">;</span> <span class="n">lea</span> <span class="n">rsi</span><span class="p">,</span> <span class="p">[</span><span class="n">r12</span> <span class="o">+</span> <span class="n">r13</span><span class="p">]</span> <span class="c">// buf address</span>
+                    <span class="p">;</span> <span class="n">mov</span> <span class="n">rdx</span><span class="p">,</span> <span class="mi">1</span>           <span class="c">// length</span>
+                    <span class="p">;</span> <span class="n">syscall</span>
+                <span class="p">},</span>
+                <span class="n">b</span><span class="sc">','</span> <span class="k">=&gt;</span> <span class="nd">dynasm!</span> <span class="p">{</span> <span class="n">code</span>
+                    <span class="p">;</span> <span class="py">.arch</span> <span class="n">x64</span>
+                    <span class="p">;</span> <span class="n">mov</span> <span class="n">rax</span><span class="p">,</span> <span class="mi">0</span>           <span class="c">// read syscall</span>
+                    <span class="p">;</span> <span class="n">mov</span> <span class="n">rdi</span><span class="p">,</span> <span class="mi">0</span>           <span class="c">// stdin's file descriptor</span>
+                    <span class="p">;</span> <span class="n">lea</span> <span class="n">rsi</span><span class="p">,</span> <span class="p">[</span><span class="n">r12</span> <span class="o">+</span> <span class="n">r13</span><span class="p">]</span> <span class="c">// buf address</span>
+                    <span class="p">;</span> <span class="n">mov</span> <span class="n">rdx</span><span class="p">,</span> <span class="mi">1</span>           <span class="c">// length</span>
+                    <span class="p">;</span> <span class="n">syscall</span>
+                <span class="p">},</span>
+                <span class="n">b</span><span class="sc">'&lt;'</span> <span class="k">=&gt;</span> <span class="nd">dynasm!</span> <span class="p">{</span> <span class="n">code</span>
+                    <span class="p">;</span> <span class="py">.arch</span> <span class="n">x64</span>
+                    <span class="p">;</span> <span class="n">sub</span> <span class="n">r13</span><span class="p">,</span> <span class="mi">1</span>
+                    <span class="p">;</span> <span class="n">mov</span> <span class="n">eax</span><span class="p">,</span> <span class="mi">29999</span>
+                    <span class="p">;</span> <span class="n">cmovb</span> <span class="n">r13</span><span class="p">,</span> <span class="n">rax</span>
+                <span class="p">},</span>
+                <span class="n">b</span><span class="sc">'&gt;'</span> <span class="k">=&gt;</span> <span class="nd">dynasm!</span> <span class="p">{</span> <span class="n">code</span>
+                    <span class="p">;</span> <span class="py">.arch</span> <span class="n">x64</span>
+                    <span class="p">;</span> <span class="n">add</span> <span class="n">r13</span><span class="p">,</span> <span class="mi">1</span>
+                    <span class="p">;</span> <span class="n">xor</span> <span class="n">eax</span><span class="p">,</span> <span class="n">eax</span>
+                    <span class="p">;</span> <span class="n">cmp</span> <span class="n">r13</span><span class="p">,</span> <span class="mi">30000</span>
+                    <span class="p">;</span> <span class="n">cmove</span> <span class="n">r13</span><span class="p">,</span> <span class="n">rax</span>
+                <span class="p">},</span>
+                <span class="n">b</span><span class="sc">'['</span> <span class="k">=&gt;</span> <span class="p">{</span>
+                    <span class="k">let</span> <span class="n">start_label</span> <span class="o">=</span> <span class="n">code</span><span class="nf">.new_dynamic_label</span><span class="p">();</span>
+                    <span class="k">let</span> <span class="n">end_label</span> <span class="o">=</span> <span class="n">code</span><span class="nf">.new_dynamic_label</span><span class="p">();</span>
+                    <span class="nd">dynasm!</span> <span class="p">{</span> <span class="n">code</span>
+                        <span class="p">;</span> <span class="py">.arch</span> <span class="n">x64</span>
+                        <span class="p">;</span> <span class="n">cmp</span> <span class="n">BYTE</span> <span class="p">[</span><span class="n">r12</span><span class="o">+</span><span class="n">r13</span><span class="p">],</span> <span class="mi">0</span>
+                        <span class="p">;</span> <span class="n">je</span> <span class="k">=&gt;</span><span class="n">end_label</span>
+                        <span class="p">;</span> <span class="k">=&gt;</span><span class="n">start_label</span>
+                    <span class="p">};</span>
+
+                    <span class="n">bracket_stack</span><span class="nf">.push</span><span class="p">((</span><span class="n">start_label</span><span class="p">,</span> <span class="n">end_label</span><span class="p">));</span>
+                <span class="p">}</span>
+                <span class="n">b</span><span class="sc">']'</span> <span class="k">=&gt;</span> <span class="p">{</span>
+                    <span class="k">let</span> <span class="p">(</span><span class="n">start_label</span><span class="p">,</span> <span class="n">end_label</span><span class="p">)</span> <span class="o">=</span> <span class="k">match</span> <span class="n">bracket_stack</span><span class="nf">.pop</span><span class="p">()</span> <span class="p">{</span>
+                        <span class="nf">Some</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">=&gt;</span> <span class="n">x</span><span class="p">,</span>
+                        <span class="nb">None</span> <span class="k">=&gt;</span> <span class="k">return</span> <span class="nf">Err</span><span class="p">(</span><span class="nf">UnbalancedBrackets</span><span class="p">(</span><span class="sc">']'</span><span class="p">,</span> <span class="n">code</span><span class="nf">.offset</span><span class="p">()</span><span class="na">.0</span><span class="p">)),</span>
+                    <span class="p">};</span>
+
+                    <span class="nd">dynasm!</span> <span class="p">{</span> <span class="n">code</span>
+                        <span class="p">;</span> <span class="py">.arch</span> <span class="n">x64</span>
+                        <span class="p">;</span> <span class="n">cmp</span> <span class="n">BYTE</span> <span class="p">[</span><span class="n">r12</span> <span class="o">+</span> <span class="n">r13</span><span class="p">],</span> <span class="mi">0</span>
+                        <span class="p">;</span> <span class="n">jne</span> <span class="k">=&gt;</span><span class="n">start_label</span>
+                        <span class="p">;</span> <span class="k">=&gt;</span> <span class="n">end_label</span>
+                    <span class="p">};</span>
+                <span class="p">}</span>
+                <span class="mi">_</span> <span class="k">=&gt;</span> <span class="k">continue</span><span class="p">,</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+
+        <span class="k">if</span> <span class="o">!</span><span class="n">bracket_stack</span><span class="nf">.is_empty</span><span class="p">()</span> <span class="p">{</span>
+            <span class="k">return</span> <span class="nf">Err</span><span class="p">(</span><span class="nf">UnbalancedBrackets</span><span class="p">(</span><span class="sc">']'</span><span class="p">,</span> <span class="n">code</span><span class="nf">.offset</span><span class="p">()</span><span class="na">.0</span><span class="p">));</span>
+        <span class="p">}</span>
+
+        <span class="nd">dynasm!</span> <span class="p">{</span> <span class="n">code</span>
+            <span class="p">;</span> <span class="py">.arch</span> <span class="n">x64</span>
+            <span class="p">;</span> <span class="n">xor</span> <span class="n">rax</span><span class="p">,</span> <span class="n">rax</span>
+            <span class="p">;</span> <span class="k">-&gt;</span><span class="n">exit</span><span class="p">:</span>
+            <span class="p">;</span> <span class="n">mov</span> <span class="n">rdi</span><span class="p">,</span> <span class="n">rax</span> <span class="c">// exit error code</span>
+            <span class="p">;</span> <span class="n">mov</span> <span class="n">rax</span><span class="p">,</span> <span class="mi">60</span>  <span class="c">// exit syscall</span>
+            <span class="p">;</span> <span class="n">syscall</span>
+        <span class="p">}</span>
+
+        <span class="nf">Ok</span><span class="p">(</span><span class="n">Program</span> <span class="p">{</span>
+            <span class="n">code</span><span class="p">:</span> <span class="n">code</span><span class="nf">.finalize</span><span class="p">()</span><span class="nf">.unwrap</span><span class="p">(),</span>
+        <span class="p">})</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Now the only thing we need to do is to write it to an object file:</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">fn</span> <span class="nf">to_object</span><span class="p">(</span><span class="o">&amp;</span><span class="k">self</span><span class="p">)</span> <span class="k">-&gt;</span> <span class="nb">Vec</span><span class="o">&lt;</span><span class="nb">u8</span><span class="o">&gt;</span> <span class="p">{</span>
+    <span class="k">let</span> <span class="k">mut</span> <span class="n">obj</span> <span class="o">=</span> <span class="nn">object</span><span class="p">::</span><span class="nn">write</span><span class="p">::</span><span class="nn">Object</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span>
+        <span class="nn">object</span><span class="p">::</span><span class="nn">BinaryFormat</span><span class="p">::</span><span class="n">Elf</span><span class="p">,</span>
+        <span class="nn">object</span><span class="p">::</span><span class="nn">Architecture</span><span class="p">::</span><span class="n">X86_64</span><span class="p">,</span>
+        <span class="nn">object</span><span class="p">::</span><span class="nn">Endianness</span><span class="p">::</span><span class="n">Little</span><span class="p">,</span>
+    <span class="p">);</span>
+
+    <span class="k">let</span> <span class="n">start</span> <span class="o">=</span> <span class="n">obj</span><span class="nf">.add_symbol</span><span class="p">(</span><span class="n">Symbol</span> <span class="p">{</span>
+        <span class="n">name</span><span class="p">:</span> <span class="n">b</span><span class="s">"_start"</span><span class="nf">.to_vec</span><span class="p">(),</span>
+        <span class="n">value</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="n">size</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="n">kind</span><span class="p">:</span> <span class="nn">object</span><span class="p">::</span><span class="nn">SymbolKind</span><span class="p">::</span><span class="n">Text</span><span class="p">,</span>
+        <span class="n">scope</span><span class="p">:</span> <span class="nn">object</span><span class="p">::</span><span class="nn">SymbolScope</span><span class="p">::</span><span class="n">Linkage</span><span class="p">,</span>
+        <span class="n">weak</span><span class="p">:</span> <span class="k">false</span><span class="p">,</span>
+        <span class="n">section</span><span class="p">:</span> <span class="nn">object</span><span class="p">::</span><span class="nn">write</span><span class="p">::</span><span class="nn">SymbolSection</span><span class="p">::</span><span class="n">Undefined</span><span class="p">,</span>
+        <span class="n">flags</span><span class="p">:</span> <span class="nn">SymbolFlags</span><span class="p">::</span><span class="nb">None</span><span class="p">,</span>
+    <span class="p">});</span>
+
+    <span class="k">let</span> <span class="n">text</span> <span class="o">=</span> <span class="n">obj</span><span class="nf">.section_id</span><span class="p">(</span><span class="nn">object</span><span class="p">::</span><span class="nn">write</span><span class="p">::</span><span class="nn">StandardSection</span><span class="p">::</span><span class="n">Text</span><span class="p">);</span>
+    <span class="n">obj</span><span class="nf">.add_symbol_data</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">text</span><span class="p">,</span> <span class="o">&amp;</span><span class="k">self</span><span class="py">.code</span><span class="p">,</span> <span class="mi">16</span><span class="p">);</span>
+    <span class="k">let</span> <span class="k">mut</span> <span class="n">out</span> <span class="o">=</span> <span class="nn">Vec</span><span class="p">::</span><span class="nf">new</span><span class="p">();</span>
+    <span class="n">obj</span><span class="nf">.emit</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span> <span class="n">out</span><span class="p">)</span><span class="nf">.unwrap</span><span class="p">();</span>
+
+    <span class="n">out</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>And in the main:</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">use</span> <span class="nn">std</span><span class="p">::{</span>
+    <span class="nn">path</span><span class="p">::{</span><span class="n">Path</span><span class="p">,</span> <span class="n">PathBuf</span><span class="p">},</span>
+    <span class="nn">process</span><span class="p">::</span><span class="n">ExitCode</span><span class="p">,</span>
+<span class="p">};</span>
+<span class="k">fn</span> <span class="nf">main</span><span class="p">()</span> <span class="k">-&gt;</span> <span class="n">ExitCode</span> <span class="p">{</span>
+    <span class="k">let</span> <span class="k">mut</span> <span class="n">args</span> <span class="o">=</span> <span class="nn">std</span><span class="p">::</span><span class="nn">env</span><span class="p">::</span><span class="nf">args</span><span class="p">();</span>
+
+    <span class="k">let</span> <span class="n">input_file</span> <span class="o">=</span> <span class="n">args</span><span class="nf">.nth</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="nf">.unwrap</span><span class="p">();</span>
+    <span class="k">let</span> <span class="n">source</span> <span class="o">=</span> <span class="k">match</span> <span class="nn">std</span><span class="p">::</span><span class="nn">fs</span><span class="p">::</span><span class="nf">read</span><span class="p">(</span><span class="o">&amp;</span><span class="n">input_file</span><span class="p">)</span> <span class="p">{</span>
+        <span class="nf">Ok</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">=&gt;</span> <span class="n">x</span><span class="p">,</span>
+        <span class="nf">Err</span><span class="p">(</span><span class="n">err</span><span class="p">)</span> <span class="k">=&gt;</span> <span class="p">{</span>
+            <span class="nd">eprintln!</span><span class="p">(</span><span class="s">"Error reading '{}': {}"</span><span class="p">,</span> <span class="n">input_file</span><span class="p">,</span> <span class="n">err</span><span class="p">);</span>
+            <span class="k">return</span> <span class="nn">ExitCode</span><span class="p">::</span><span class="nf">from</span><span class="p">(</span><span class="mi">2</span><span class="p">);</span>
+        <span class="p">}</span>
+    <span class="p">};</span>
+
+    <span class="k">let</span> <span class="n">program</span> <span class="o">=</span> <span class="k">match</span> <span class="nn">Program</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span><span class="o">&amp;</span><span class="n">source</span><span class="p">)</span> <span class="p">{</span>
+        <span class="nf">Ok</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">=&gt;</span> <span class="n">x</span><span class="p">,</span>
+        <span class="nf">Err</span><span class="p">(</span><span class="nf">UnbalancedBrackets</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">address</span><span class="p">))</span> <span class="k">=&gt;</span> <span class="p">{</span>
+            <span class="nd">eprintln!</span><span class="p">(</span>
+                <span class="s">"Error parsing file: didn't found pair for `{}` at instruction index {}"</span><span class="p">,</span>
+                <span class="n">c</span><span class="p">,</span> <span class="n">address</span>
+            <span class="p">);</span>
+            <span class="k">return</span> <span class="nn">ExitCode</span><span class="p">::</span><span class="nf">from</span><span class="p">(</span><span class="mi">3</span><span class="p">);</span>
+        <span class="p">}</span>
+    <span class="p">};</span>
+
+    <span class="k">let</span> <span class="n">file_name</span> <span class="o">=</span> <span class="nn">Path</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span><span class="o">&amp;</span><span class="n">input_file</span><span class="p">)</span><span class="nf">.file_name</span><span class="p">()</span><span class="nf">.unwrap</span><span class="p">();</span>
+    <span class="k">let</span> <span class="n">output_file</span> <span class="o">=</span> <span class="nn">PathBuf</span><span class="p">::</span><span class="nf">from</span><span class="p">(</span><span class="o">&amp;</span><span class="n">file_name</span><span class="p">)</span><span class="nf">.with_extension</span><span class="p">(</span><span class="s">"o"</span><span class="p">);</span>
+
+    <span class="k">let</span> <span class="n">obj</span> <span class="o">=</span> <span class="n">program</span><span class="nf">.to_object</span><span class="p">();</span>
+    <span class="nn">std</span><span class="p">::</span><span class="nn">fs</span><span class="p">::</span><span class="nf">write</span><span class="p">(</span><span class="n">output_file</span><span class="p">,</span> <span class="n">obj</span><span class="p">)</span><span class="nf">.unwrap</span><span class="p">();</span>
+
+    <span class="nn">ExitCode</span><span class="p">::</span><span class="nf">from</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>And if we run:</p>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>cargo run <span class="nt">-p</span> singlepass-compiler <span class="nt">--</span> programs/factor.bf
+    Finished dev <span class="o">[</span>unoptimized + debuginfo] target<span class="o">(</span>s<span class="o">)</span> <span class="k">in </span>0.03s
+     Running <span class="sb">`</span>target/debug/singlepass-compiler programs/factor.bf<span class="sb">`</span>
+<span class="nv">$ </span>ld factor.o <span class="nt">-o</span> <span class="nb">factor</span>
+<span class="nv">$ </span>./factor
+123456
+123456: 2 2 2 2 2 2 3 643
+</code></pre></div></div>
+
+<p>It works!</p>
+<h1 id="linking-object-files">
+  
+  
+    Linking object files&nbsp<a href="#linking-object-files" class="anchor">§</a>
+  
+  
+</h1>
+    
+
+<p>Now let’s take a look at linking multiple object files.</p>
+
+<p>First let’s modify our hello world example to instead of calling the <code class="language-plaintext highlighter-rouge">write</code>
+syscall directly, it will call a function defined in another file. So we
+declared that <code class="language-plaintext highlighter-rouge">my_write</code> is an external symbol, and call it, passing the string
+address and length as argument:</p>
+
+<div class="language-nasm highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nf">section</span> <span class="nv">.text</span>
+    <span class="nf">global</span> <span class="nv">_start</span> 
+    <span class="nf">extern</span> <span class="nv">my_write</span>
+
+<span class="nl">_start:</span>
+    <span class="nf">lea</span> <span class="nb">rdi</span><span class="p">,</span> <span class="p">[</span><span class="nv">rel</span> <span class="nv">hello</span><span class="p">]</span> <span class="c1">; string to write</span>
+    <span class="nf">mov</span> <span class="nb">rsi</span><span class="p">,</span> <span class="nv">helloLen</span>    <span class="c1">; length of string to write</span>
+    <span class="nf">call</span> <span class="nv">my_write</span>
+
+    <span class="c1">; Terminate program</span>
+    <span class="nf">mov</span> <span class="nb">rax</span><span class="p">,</span> <span class="mi">60</span>          <span class="c1">; 'exit' system call = 60</span>
+    <span class="nf">mov</span> <span class="nb">rdi</span><span class="p">,</span> <span class="mi">0</span>           <span class="c1">; exit with error code 0</span>
+    <span class="nf">syscall</span>              <span class="c1">; call the kernel</span>
+    <span class="nl">hello:</span>    <span class="kd">db</span> <span class="s">'Hello world!'</span><span class="p">,</span><span class="mi">10</span>
+    <span class="nl">helloLen:</span> <span class="nf">equ</span> <span class="kc">$</span><span class="o">-</span><span class="nv">hello</span>
+</code></pre></div></div>
+
+<p>And in a file called <code class="language-plaintext highlighter-rouge">write.as</code>, we declared <code class="language-plaintext highlighter-rouge">my_write</code> as global:</p>
+
+<div class="language-nasm highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nf">section</span> <span class="nv">.text</span>
+    <span class="nf">global</span> <span class="nv">my_write</span>
+
+<span class="nl">my_write:</span>
+    <span class="nf">push</span> <span class="nb">rbp</span>        <span class="c1">; push rbp to keep the stack 16 bytes aligned, and</span>
+    <span class="nf">mov</span> <span class="nb">rbp</span><span class="p">,</span> <span class="nb">rsp</span>    <span class="c1">; also setup the stack frame.</span>
+
+    <span class="nf">mov</span> <span class="nb">rdx</span><span class="p">,</span> <span class="nb">rsi</span>    <span class="c1">; length of string to write</span>
+    <span class="nf">mov</span> <span class="nb">rsi</span><span class="p">,</span> <span class="nb">rdi</span>    <span class="c1">; string to write</span>
+    <span class="nf">mov</span> <span class="nb">rax</span><span class="p">,</span> <span class="mi">1</span>      <span class="c1">; 'write' system call = 1</span>
+    <span class="nf">mov</span> <span class="nb">rdi</span><span class="p">,</span> <span class="mi">1</span>      <span class="c1">; file descriptor 1 = STDOUT</span>
+    <span class="nf">syscall</span>         <span class="c1">; call the kernel</span>
+
+    <span class="nf">pop</span> <span class="nb">rbp</span>
+    <span class="nf">ret</span>
+</code></pre></div></div>
+
+<p>If we assemble and link everything, we see that it continues to work:</p>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>nasm hello.as <span class="nt">-f</span> elf64 <span class="nt">-o</span> hello.o
+<span class="nv">$ </span>nasm write.as <span class="nt">-f</span> elf64 <span class="nt">-o</span> write.o
+<span class="nv">$ </span>ld hello.o write.o <span class="nt">-o</span> hello
+<span class="nv">$ </span>./hello
+Hello world!
+</code></pre></div></div>
+
+<p>Now if we take a look at <code class="language-plaintext highlighter-rouge">hello.o</code> we will see that it now contains relocations:</p>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>readelf <span class="nt">-r</span> hello.o
+
+Relocation section <span class="s1">'.rela.text'</span> at offset 0x300 contains 1 entry:
+  Offset          Info           Type           Sym. Value    Sym. Name + Addend
+00000000000d  000500000002 R_X86_64_PC32     0000000000000000 my_write - 4
+</code></pre></div></div>
+
+<p>The relocation is of type <code class="language-plaintext highlighter-rouge">R_X86_64_PC32</code>, which means that it writes a 32-bit
+word whose value is the offset from the relocation to the given symbol. This is
+because the call instruction receives an offset as argument.</p>
+
+<p>But the call instruction receives an offset relative to the address of the next
+instruction, so instead of writing <code class="language-plaintext highlighter-rouge">S - P</code> (symbol minus relocation address) it
+should be written <code class="language-plaintext highlighter-rouge">S - (P + 4)</code>, i.e., <code class="language-plaintext highlighter-rouge">S - P - 4</code>. So the relocation has an
+addend of <code class="language-plaintext highlighter-rouge">-4</code>.</p>
+
+<p>So let’s translate that new version of the code to our example compiler. The
+code now is:</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">let</span> <span class="k">mut</span> <span class="n">code</span><span class="p">:</span> <span class="n">VecAssembler</span><span class="o">&lt;</span><span class="n">X64Relocation</span><span class="o">&gt;</span> <span class="o">=</span> <span class="nn">VecAssembler</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
+
+<span class="k">let</span> <span class="n">hello_str</span> <span class="o">=</span> <span class="n">b</span><span class="s">"Hello world!</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
+<span class="k">let</span> <span class="n">len</span> <span class="o">=</span> <span class="n">hello_str</span><span class="nf">.len</span><span class="p">()</span> <span class="k">as</span> <span class="nb">i32</span><span class="p">;</span>
+
+<span class="k">let</span> <span class="n">relocation_offset</span><span class="p">;</span>
+<span class="nd">dynasm!</span><span class="p">(</span><span class="n">code</span>
+    <span class="p">;</span> <span class="n">lea</span> <span class="n">rdi</span><span class="p">,</span> <span class="p">[</span><span class="o">&gt;</span><span class="n">hello</span><span class="p">]</span>    <span class="c">// string to write</span>
+    <span class="p">;</span> <span class="n">mov</span> <span class="n">rsi</span><span class="p">,</span> <span class="n">DWORD</span> <span class="n">len</span>   <span class="c">// length of string to write</span>
+    <span class="p">;</span> <span class="n">call</span> <span class="n">DWORD</span> <span class="mi">0</span>
+    <span class="p">;;</span> <span class="n">relocation_offset</span> <span class="o">=</span> <span class="n">code</span><span class="nf">.offset</span><span class="p">()</span><span class="na">.0</span> <span class="k">as</span> <span class="nb">u64</span> <span class="o">-</span> <span class="mi">4</span>
+
+    <span class="c">// Terminate program</span>
+    <span class="p">;</span> <span class="n">mov</span> <span class="n">eax</span><span class="p">,</span><span class="mi">60</span>           <span class="c">// 'exit' system call</span>
+    <span class="p">;</span> <span class="n">mov</span> <span class="n">edi</span><span class="p">,</span><span class="mi">0</span>            <span class="c">// exit with error code 0</span>
+    <span class="p">;</span> <span class="n">syscall</span>              <span class="c">// call the kernel</span>
+    <span class="p">;</span> <span class="n">hello</span><span class="p">:</span>
+    <span class="p">;</span> <span class="py">.bytes</span> <span class="n">hello_str</span>
+<span class="p">);</span>
+
+<span class="k">let</span> <span class="n">code</span> <span class="o">=</span> <span class="n">code</span><span class="nf">.finalize</span><span class="p">()</span><span class="nf">.unwrap</span><span class="p">();</span>
+</code></pre></div></div>
+
+<p>As the address of <code class="language-plaintext highlighter-rouge">my_write</code> is unknown at this point, the call instruction
+receives a dummy value for now and the offset where the relocation will take
+place is saved in <code class="language-plaintext highlighter-rouge">relocation_offset</code>.</p>
+
+<p>So, we when we are building the <code class="language-plaintext highlighter-rouge">Object</code>, we add the <code class="language-plaintext highlighter-rouge">my_write</code> symbol, and the
+relocation. The new symbol is mostly equal to the other one, the only difference
+is the name, and that we will not call <code class="language-plaintext highlighter-rouge">add_symbol_data</code> to it.</p>
+
+<p>The relocation will have size of 32bits; its kind is <code class="language-plaintext highlighter-rouge">Relative</code>; in this
+particular case the encoding don’t change anything, so I set it to <code class="language-plaintext highlighter-rouge">Generic</code>;
+and I make sure to set the <code class="language-plaintext highlighter-rouge">addend</code> to <code class="language-plaintext highlighter-rouge">-4</code>, as we have seen previously:</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">let</span> <span class="n">my_write</span> <span class="o">=</span> <span class="n">obj</span><span class="nf">.add_symbol</span><span class="p">(</span><span class="n">Symbol</span> <span class="p">{</span>
+    <span class="n">name</span><span class="p">:</span> <span class="n">b</span><span class="s">"my_write"</span><span class="nf">.to_vec</span><span class="p">(),</span>
+    <span class="n">value</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="n">size</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="n">kind</span><span class="p">:</span> <span class="nn">object</span><span class="p">::</span><span class="nn">SymbolKind</span><span class="p">::</span><span class="n">Text</span><span class="p">,</span>
+    <span class="n">scope</span><span class="p">:</span> <span class="nn">object</span><span class="p">::</span><span class="nn">SymbolScope</span><span class="p">::</span><span class="n">Linkage</span><span class="p">,</span>
+    <span class="n">weak</span><span class="p">:</span> <span class="k">false</span><span class="p">,</span>
+    <span class="n">section</span><span class="p">:</span> <span class="nn">object</span><span class="p">::</span><span class="nn">write</span><span class="p">::</span><span class="nn">SymbolSection</span><span class="p">::</span><span class="n">Undefined</span><span class="p">,</span>
+    <span class="n">flags</span><span class="p">:</span> <span class="nn">SymbolFlags</span><span class="p">::</span><span class="nb">None</span><span class="p">,</span>
+<span class="p">});</span>
+
+<span class="k">let</span> <span class="n">text</span> <span class="o">=</span> <span class="n">obj</span><span class="nf">.section_id</span><span class="p">(</span><span class="nn">object</span><span class="p">::</span><span class="nn">write</span><span class="p">::</span><span class="nn">StandardSection</span><span class="p">::</span><span class="n">Text</span><span class="p">);</span>
+<span class="n">obj</span><span class="nf">.add_relocation</span><span class="p">(</span>
+    <span class="n">text</span><span class="p">,</span>
+    <span class="n">Relocation</span> <span class="p">{</span>
+        <span class="n">offset</span><span class="p">:</span> <span class="n">relocation_offset</span><span class="p">,</span>
+        <span class="n">size</span><span class="p">:</span> <span class="mi">32</span><span class="p">,</span>
+        <span class="n">kind</span><span class="p">:</span> <span class="nn">object</span><span class="p">::</span><span class="nn">RelocationKind</span><span class="p">::</span><span class="n">Relative</span><span class="p">,</span>
+        <span class="n">encoding</span><span class="p">:</span> <span class="nn">object</span><span class="p">::</span><span class="nn">RelocationEncoding</span><span class="p">::</span><span class="n">Generic</span><span class="p">,</span>
+        <span class="n">symbol</span><span class="p">:</span> <span class="n">my_write</span><span class="p">,</span>
+        <span class="n">addend</span><span class="p">:</span> <span class="o">-</span><span class="mi">4</span><span class="p">,</span>
+    <span class="p">},</span>
+<span class="p">)</span>
+<span class="nf">.unwrap</span><span class="p">();</span>
+</code></pre></div></div>
+
+<p>If we run and link to <code class="language-plaintext highlighter-rouge">write.o</code> we see that it works!</p>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>cargo run <span class="nt">-p</span> object-example <span class="nt">--</span> obj
+    Finished dev <span class="o">[</span>unoptimized + debuginfo] target<span class="o">(</span>s<span class="o">)</span> <span class="k">in </span>0.03s
+     Running <span class="sb">`</span>../target/debug/object-example obj<span class="sb">`</span>
+<span class="nv">$ </span>ld hello.o write.o
+<span class="nv">$ </span>./hello
+Hello world!
+</code></pre></div></div>
+
+<p>But now, let’s try, instead of linking to an object written in assembly, link to
+a static lib written in Rust.</p>
+
+<p>For this, let’s rewrite <code class="language-plaintext highlighter-rouge">write.as</code> as <code class="language-plaintext highlighter-rouge">write.rs</code>:</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nd">#[no_mangle]</span>
+<span class="k">pub</span> <span class="k">extern</span> <span class="s">"sysv64"</span> <span class="k">fn</span> <span class="nf">my_write</span><span class="p">(</span><span class="n">address</span><span class="p">:</span> <span class="o">*</span><span class="k">const</span> <span class="nb">u8</span><span class="p">,</span> <span class="n">len</span><span class="p">:</span> <span class="nb">usize</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">let</span> <span class="n">string</span> <span class="o">=</span> <span class="k">unsafe</span> <span class="p">{</span> <span class="nn">std</span><span class="p">::</span><span class="nn">slice</span><span class="p">::</span><span class="nf">from_raw_parts</span><span class="p">(</span><span class="n">address</span><span class="p">,</span> <span class="n">len</span><span class="p">)</span> <span class="p">};</span>
+    <span class="k">let</span> <span class="n">string</span> <span class="o">=</span> <span class="nn">std</span><span class="p">::</span><span class="nn">str</span><span class="p">::</span><span class="nf">from_utf8</span><span class="p">(</span><span class="n">string</span><span class="p">)</span><span class="nf">.unwrap</span><span class="p">();</span>
+    <span class="nd">print!</span><span class="p">(</span><span class="s">"{}"</span><span class="p">,</span> <span class="n">string</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>We need to add the attribute <code class="language-plaintext highlighter-rouge">no_mangle</code> to make sure that <code class="language-plaintext highlighter-rouge">rustc</code> don’t
+<a href="https://en.wikipedia.org/wiki/Name_mangling#Rust">mangle</a> the name of the symbol for this function.</p>
+
+<p>So we can compile the code to a static library using <code class="language-plaintext highlighter-rouge">rustc</code> (I didn’t bother
+creating an entire cargo project for a single function):</p>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>rustc <span class="nt">--crate-type</span><span class="o">=</span>staticlib write.rs
+</code></pre></div></div>
+
+<p>This produces a <code class="language-plaintext highlighter-rouge">libwrite.a</code>, which is a static library. Static libraries are
+basically an archive containing multiple object files (you can list them by
+running <code class="language-plaintext highlighter-rouge">ar -t libwrite.a</code>).</p>
+
+<p>Now we can try linking the library with our compiler object (make sure to put
+object files before the libraries that they depend on):</p>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>ld hello.o libwrite.a
+</code></pre></div></div>
+
+<p>If run the command above, you will notice that it will output almost 3000 lines
+of “undefined symbol” errors. That is because the Rust library that we build is
+static linked to the Rust standard library, that in turn depends on some
+libraries provided by the OS.</p>
+
+<p>One way of fixing the error is by finding all libraries that define all the
+missing symbols, and add them as argument to the linker. This is kinda tricky, I
+am not even sure if this would work, and it will vary between Linux distros, so
+let’s instead use <code class="language-plaintext highlighter-rouge">gcc</code> to link everything. It will already take care of linking
+all system libraries.</p>
+
+<p>The std also needs some extra static libraries. To get a list of them you can
+pass <code class="language-plaintext highlighter-rouge">--print=native-static-libs</code> to the rustc invocation:</p>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>rustc <span class="nt">--crate-type</span><span class="o">=</span>staticlib write.rs <span class="nt">--print</span><span class="o">=</span>native-static-libs
+note: Link against the following native artifacts when linking against this static library. The order and any duplication can be significant on some platforms.
+
+note: native-static-libs: <span class="nt">-lgcc_s</span> <span class="nt">-lutil</span> <span class="nt">-lrt</span> <span class="nt">-lpthread</span> <span class="nt">-lm</span> <span class="nt">-ldl</span> <span class="nt">-lc</span>
+
+<span class="nv">$ </span>gcc hello.o libwrite.a <span class="nt">-o</span> hello <span class="nt">-nostartfiles</span> <span class="nt">-lgcc_s</span> <span class="nt">-lutil</span> <span class="nt">-lrt</span> <span class="nt">-lpthread</span> <span class="nt">-lm</span> <span class="nt">-ldl</span> <span class="nt">-lc</span>
+<span class="nv">$ </span>./hello
+Hello world!
+</code></pre></div></div>
+
+<p>And it works! Note that I need to pass <code class="language-plaintext highlighter-rouge">-nostartfiles</code>, because I am declaring
+<code class="language-plaintext highlighter-rouge">_start</code> directly, instead of declaring a <code class="language-plaintext highlighter-rouge">main</code> function that would be called
+by the C runtime.</p>
+<h1 id="a-static-compiler">
+  
+  
+    A Static Compiler&nbsp<a href="#a-static-compiler" class="anchor">§</a>
+  
+  
+</h1>
+    
+
+<p>Now we can make the final version of our single-pass compiler. First, we create a
+library with all functions that we will use in our compiled brainfuck programs.</p>
+
+<p>We will put them in a file called <code class="language-plaintext highlighter-rouge">bf_lib.rs</code>. There will be our <code class="language-plaintext highlighter-rouge">read</code> and
+<code class="language-plaintext highlighter-rouge">write</code> function, and also a function for exiting. Also, these function will not
+return errors, because there is no one to report them like in our JIT version.
+Instead, they only print the error message and exit.</p>
+
+<p>I will also prefix each function with <code class="language-plaintext highlighter-rouge">bf_</code> to avoid symbol conflicts:</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">use</span> <span class="nn">std</span><span class="p">::</span><span class="nn">io</span><span class="p">::{</span><span class="n">Read</span><span class="p">,</span> <span class="n">Write</span><span class="p">};</span>
+
+<span class="nd">#[no_mangle]</span>
+<span class="k">pub</span> <span class="k">extern</span> <span class="s">"sysv64"</span> <span class="k">fn</span> <span class="nf">bf_write</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="nb">u8</span><span class="p">)</span> <span class="p">{</span>
+    <span class="c">// Writing a non-UTF-8 byte sequence on Windows error out.</span>
+    <span class="k">if</span> <span class="nd">cfg!</span><span class="p">(</span><span class="n">target_os</span> <span class="o">=</span> <span class="s">"windows"</span><span class="p">)</span> <span class="o">&amp;&amp;</span> <span class="n">value</span> <span class="o">&gt;=</span> <span class="mi">128</span> <span class="p">{</span>
+        <span class="k">return</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="k">let</span> <span class="k">mut</span> <span class="n">stdout</span> <span class="o">=</span> <span class="nn">std</span><span class="p">::</span><span class="nn">io</span><span class="p">::</span><span class="nf">stdout</span><span class="p">()</span><span class="nf">.lock</span><span class="p">();</span>
+
+    <span class="k">let</span> <span class="n">result</span> <span class="o">=</span> <span class="n">stdout</span><span class="nf">.write_all</span><span class="p">(</span><span class="o">&amp;</span><span class="p">[</span><span class="n">value</span><span class="p">])</span><span class="nf">.and_then</span><span class="p">(|</span><span class="mi">_</span><span class="p">|</span> <span class="n">stdout</span><span class="nf">.flush</span><span class="p">());</span>
+
+    <span class="k">if</span> <span class="k">let</span> <span class="nf">Err</span><span class="p">(</span><span class="n">err</span><span class="p">)</span> <span class="o">=</span> <span class="n">result</span> <span class="p">{</span>
+        <span class="nd">eprintln!</span><span class="p">(</span><span class="s">"IO error: {}"</span><span class="p">,</span> <span class="n">err</span><span class="p">);</span>
+        <span class="nn">std</span><span class="p">::</span><span class="nn">process</span><span class="p">::</span><span class="nf">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="nd">#[no_mangle]</span>
+<span class="k">pub</span> <span class="k">unsafe</span> <span class="k">extern</span> <span class="s">"sysv64"</span> <span class="k">fn</span> <span class="nf">bf_read</span><span class="p">(</span><span class="n">buf</span><span class="p">:</span> <span class="o">*</span><span class="k">mut</span> <span class="nb">u8</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">let</span> <span class="k">mut</span> <span class="n">stdin</span> <span class="o">=</span> <span class="nn">std</span><span class="p">::</span><span class="nn">io</span><span class="p">::</span><span class="nf">stdin</span><span class="p">()</span><span class="nf">.lock</span><span class="p">();</span>
+    <span class="k">loop</span> <span class="p">{</span>
+        <span class="k">let</span> <span class="k">mut</span> <span class="n">value</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+        <span class="k">let</span> <span class="n">err</span> <span class="o">=</span> <span class="n">stdin</span><span class="nf">.read_exact</span><span class="p">(</span><span class="nn">std</span><span class="p">::</span><span class="nn">slice</span><span class="p">::</span><span class="nf">from_mut</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span> <span class="n">value</span><span class="p">));</span>
+
+        <span class="k">if</span> <span class="k">let</span> <span class="nf">Err</span><span class="p">(</span><span class="n">err</span><span class="p">)</span> <span class="o">=</span> <span class="n">err</span> <span class="p">{</span>
+            <span class="k">if</span> <span class="n">err</span><span class="nf">.kind</span><span class="p">()</span> <span class="o">!=</span> <span class="nn">std</span><span class="p">::</span><span class="nn">io</span><span class="p">::</span><span class="nn">ErrorKind</span><span class="p">::</span><span class="n">UnexpectedEof</span> <span class="p">{</span>
+                <span class="nd">eprintln!</span><span class="p">(</span><span class="s">"IO error: {}"</span><span class="p">,</span> <span class="n">err</span><span class="p">);</span>
+                <span class="nn">std</span><span class="p">::</span><span class="nn">process</span><span class="p">::</span><span class="nf">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+            <span class="p">}</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+        <span class="p">}</span>
+
+        <span class="c">// ignore CR from Window's CRLF</span>
+        <span class="k">if</span> <span class="nd">cfg!</span><span class="p">(</span><span class="n">target_os</span> <span class="o">=</span> <span class="s">"windows"</span><span class="p">)</span> <span class="o">&amp;&amp;</span> <span class="n">value</span> <span class="o">==</span> <span class="n">b</span><span class="sc">'\r'</span> <span class="p">{</span>
+            <span class="k">continue</span><span class="p">;</span>
+        <span class="p">}</span>
+
+        <span class="o">*</span><span class="n">buf</span> <span class="o">=</span> <span class="n">value</span><span class="p">;</span>
+        <span class="k">break</span><span class="p">;</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="nd">#[no_mangle]</span>
+<span class="k">pub</span> <span class="k">unsafe</span> <span class="k">extern</span> <span class="s">"sysv64"</span> <span class="k">fn</span> <span class="nf">bf_exit</span><span class="p">()</span> <span class="p">{</span>
+    <span class="nn">std</span><span class="p">::</span><span class="nn">process</span><span class="p">::</span><span class="nf">exit</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Now in our compiler, we will call these functions instead of the syscall. We
+need to register the relocations for each call.</p>
+
+<p>So <code class="language-plaintext highlighter-rouge">Program</code> becomes:</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">struct</span> <span class="n">Program</span> <span class="p">{</span>
+    <span class="n">code</span><span class="p">:</span> <span class="nb">Vec</span><span class="o">&lt;</span><span class="nb">u8</span><span class="o">&gt;</span><span class="p">,</span>
+    <span class="n">write_relocations</span><span class="p">:</span> <span class="nb">Vec</span><span class="o">&lt;</span><span class="nb">usize</span><span class="o">&gt;</span><span class="p">,</span>
+    <span class="n">read_relocations</span><span class="p">:</span> <span class="nb">Vec</span><span class="o">&lt;</span><span class="nb">usize</span><span class="o">&gt;</span><span class="p">,</span>
+    <span class="n">exit_relocation</span><span class="p">:</span> <span class="nb">usize</span><span class="p">,</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>And the compilation:</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">let</span> <span class="k">mut</span> <span class="n">write_relocations</span> <span class="o">=</span> <span class="nn">Vec</span><span class="p">::</span><span class="nf">new</span><span class="p">();</span>
+<span class="k">let</span> <span class="k">mut</span> <span class="n">read_relocations</span> <span class="o">=</span> <span class="nn">Vec</span><span class="p">::</span><span class="nf">new</span><span class="p">();</span>
+</code></pre></div></div>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">b</span><span class="sc">'.'</span> <span class="k">=&gt;</span> <span class="nd">dynasm!</span> <span class="p">{</span> <span class="n">code</span>
+    <span class="p">;</span> <span class="py">.arch</span> <span class="n">x64</span>
+    <span class="p">;</span> <span class="n">mov</span> <span class="n">rdi</span><span class="p">,</span> <span class="p">[</span><span class="n">r12</span> <span class="o">+</span> <span class="n">r13</span><span class="p">]</span> <span class="c">// cell value</span>
+    <span class="p">;</span> <span class="n">call</span> <span class="n">DWORD</span> <span class="mi">0</span>
+    <span class="p">;;</span> <span class="n">write_relocations</span><span class="nf">.push</span><span class="p">(</span><span class="n">code</span><span class="nf">.offset</span><span class="p">()</span><span class="na">.0</span> <span class="o">-</span> <span class="mi">4</span><span class="p">)</span>
+<span class="p">},</span>
+<span class="n">b</span><span class="sc">','</span> <span class="k">=&gt;</span> <span class="nd">dynasm!</span> <span class="p">{</span> <span class="n">code</span>
+    <span class="p">;</span> <span class="py">.arch</span> <span class="n">x64</span>
+    <span class="p">;</span> <span class="n">lea</span> <span class="n">rdi</span><span class="p">,</span> <span class="p">[</span><span class="n">r12</span> <span class="o">+</span> <span class="n">r13</span><span class="p">]</span> <span class="c">// cell address</span>
+    <span class="p">;</span> <span class="n">call</span> <span class="n">DWORD</span> <span class="mi">0</span>
+    <span class="p">;;</span> <span class="n">read_relocations</span><span class="nf">.push</span><span class="p">(</span><span class="n">code</span><span class="nf">.offset</span><span class="p">()</span><span class="na">.0</span> <span class="o">-</span> <span class="mi">4</span><span class="p">)</span>
+<span class="p">},</span>
+</code></pre></div></div>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">let</span> <span class="n">exit_relocation</span><span class="p">;</span>
+
+<span class="nd">dynasm!</span> <span class="p">{</span> <span class="n">code</span>
+    <span class="p">;</span> <span class="py">.arch</span> <span class="n">x64</span>
+    <span class="p">;</span> <span class="n">call</span> <span class="n">DWORD</span> <span class="mi">0</span>
+    <span class="p">;;</span> <span class="n">exit_relocation</span> <span class="o">=</span> <span class="n">code</span><span class="nf">.offset</span><span class="p">()</span><span class="na">.0</span> <span class="o">-</span> <span class="mi">4</span>
+<span class="p">}</span>
+
+<span class="nf">Ok</span><span class="p">(</span><span class="n">Program</span> <span class="p">{</span>
+    <span class="n">code</span><span class="p">:</span> <span class="n">code</span><span class="nf">.finalize</span><span class="p">()</span><span class="nf">.unwrap</span><span class="p">(),</span>
+    <span class="n">write_relocations</span><span class="p">,</span>
+    <span class="n">read_relocations</span><span class="p">,</span>
+    <span class="n">exit_relocation</span><span class="p">,</span>
+<span class="p">})</span>
+</code></pre></div></div>
+
+<p>And we make sure to write these relocations on the generated object:</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">fn</span> <span class="nf">to_elf_object</span><span class="p">(</span><span class="o">&amp;</span><span class="k">self</span><span class="p">)</span> <span class="k">-&gt;</span> <span class="nb">Vec</span><span class="o">&lt;</span><span class="nb">u8</span><span class="o">&gt;</span> <span class="p">{</span>
+    <span class="k">let</span> <span class="k">mut</span> <span class="n">obj</span> <span class="o">=</span> <span class="nn">object</span><span class="p">::</span><span class="nn">write</span><span class="p">::</span><span class="nn">Object</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span>
+        <span class="nn">object</span><span class="p">::</span><span class="nn">BinaryFormat</span><span class="p">::</span><span class="n">Elf</span><span class="p">,</span>
+        <span class="nn">object</span><span class="p">::</span><span class="nn">Architecture</span><span class="p">::</span><span class="n">X86_64</span><span class="p">,</span>
+        <span class="nn">object</span><span class="p">::</span><span class="nn">Endianness</span><span class="p">::</span><span class="n">Little</span><span class="p">,</span>
+    <span class="p">);</span>
+
+    <span class="k">let</span> <span class="k">mut</span> <span class="n">add_symbol</span> <span class="o">=</span> <span class="p">|</span><span class="n">name</span><span class="p">:</span> <span class="o">&amp;</span><span class="p">[</span><span class="nb">u8</span><span class="p">]|</span> <span class="p">{</span>
+        <span class="n">obj</span><span class="nf">.add_symbol</span><span class="p">(</span><span class="n">Symbol</span> <span class="p">{</span>
+            <span class="n">name</span><span class="p">:</span> <span class="n">name</span><span class="nf">.to_vec</span><span class="p">(),</span>
+            <span class="n">value</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="n">size</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="n">kind</span><span class="p">:</span> <span class="nn">object</span><span class="p">::</span><span class="nn">SymbolKind</span><span class="p">::</span><span class="n">Text</span><span class="p">,</span>
+            <span class="n">scope</span><span class="p">:</span> <span class="nn">object</span><span class="p">::</span><span class="nn">SymbolScope</span><span class="p">::</span><span class="n">Linkage</span><span class="p">,</span>
+            <span class="n">weak</span><span class="p">:</span> <span class="k">false</span><span class="p">,</span>
+            <span class="n">section</span><span class="p">:</span> <span class="nn">object</span><span class="p">::</span><span class="nn">write</span><span class="p">::</span><span class="nn">SymbolSection</span><span class="p">::</span><span class="n">Undefined</span><span class="p">,</span>
+            <span class="n">flags</span><span class="p">:</span> <span class="nn">SymbolFlags</span><span class="p">::</span><span class="nb">None</span><span class="p">,</span>
+        <span class="p">})</span>
+    <span class="p">};</span>
+
+    <span class="k">let</span> <span class="n">start</span> <span class="o">=</span> <span class="nf">add_symbol</span><span class="p">(</span><span class="n">b</span><span class="s">"_start"</span><span class="p">);</span>
+    <span class="k">let</span> <span class="n">bf_write</span> <span class="o">=</span> <span class="nf">add_symbol</span><span class="p">(</span><span class="n">b</span><span class="s">"bf_write"</span><span class="p">);</span>
+    <span class="k">let</span> <span class="n">bf_read</span> <span class="o">=</span> <span class="nf">add_symbol</span><span class="p">(</span><span class="n">b</span><span class="s">"bf_read"</span><span class="p">);</span>
+    <span class="k">let</span> <span class="n">bf_exit</span> <span class="o">=</span> <span class="nf">add_symbol</span><span class="p">(</span><span class="n">b</span><span class="s">"bf_exit"</span><span class="p">);</span>
+
+    <span class="k">let</span> <span class="n">text</span> <span class="o">=</span> <span class="n">obj</span><span class="nf">.section_id</span><span class="p">(</span><span class="nn">object</span><span class="p">::</span><span class="nn">write</span><span class="p">::</span><span class="nn">StandardSection</span><span class="p">::</span><span class="n">Text</span><span class="p">);</span>
+    <span class="n">obj</span><span class="nf">.add_symbol_data</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">text</span><span class="p">,</span> <span class="o">&amp;</span><span class="k">self</span><span class="py">.code</span><span class="p">,</span> <span class="mi">16</span><span class="p">);</span>
+
+    <span class="k">let</span> <span class="k">mut</span> <span class="n">add_call_reloc</span> <span class="o">=</span> <span class="p">|</span><span class="n">offset</span><span class="p">,</span> <span class="n">symbol</span><span class="p">|</span> <span class="p">{</span>
+        <span class="n">obj</span><span class="nf">.add_relocation</span><span class="p">(</span>
+            <span class="n">text</span><span class="p">,</span>
+            <span class="n">Relocation</span> <span class="p">{</span>
+                <span class="n">offset</span><span class="p">:</span> <span class="n">offset</span> <span class="k">as</span> <span class="nb">u64</span><span class="p">,</span>
+                <span class="n">symbol</span><span class="p">,</span>
+                <span class="n">size</span><span class="p">:</span> <span class="mi">32</span><span class="p">,</span>
+                <span class="n">kind</span><span class="p">:</span> <span class="nn">object</span><span class="p">::</span><span class="nn">RelocationKind</span><span class="p">::</span><span class="n">Relative</span><span class="p">,</span>
+                <span class="n">encoding</span><span class="p">:</span> <span class="nn">object</span><span class="p">::</span><span class="nn">RelocationEncoding</span><span class="p">::</span><span class="n">Generic</span><span class="p">,</span>
+                <span class="n">addend</span><span class="p">:</span> <span class="o">-</span><span class="mi">4</span><span class="p">,</span>
+            <span class="p">},</span>
+        <span class="p">)</span>
+        <span class="nf">.unwrap</span><span class="p">();</span>
+    <span class="p">};</span>
+
+    <span class="k">for</span> <span class="n">offset</span> <span class="n">in</span> <span class="k">self</span><span class="py">.read_relocations</span><span class="nf">.iter</span><span class="p">()</span><span class="nf">.copied</span><span class="p">()</span> <span class="p">{</span>
+        <span class="nf">add_call_reloc</span><span class="p">(</span><span class="n">offset</span><span class="p">,</span> <span class="n">bf_read</span><span class="p">);</span>
+    <span class="p">}</span>
+    <span class="k">for</span> <span class="n">offset</span> <span class="n">in</span> <span class="k">self</span><span class="py">.write_relocations</span><span class="nf">.iter</span><span class="p">()</span><span class="nf">.copied</span><span class="p">()</span> <span class="p">{</span>
+        <span class="nf">add_call_reloc</span><span class="p">(</span><span class="n">offset</span><span class="p">,</span> <span class="n">bf_write</span><span class="p">);</span>
+    <span class="p">}</span>
+    <span class="nf">add_call_reloc</span><span class="p">(</span><span class="k">self</span><span class="py">.exit_relocation</span><span class="p">,</span> <span class="n">bf_exit</span><span class="p">);</span>
+
+    <span class="k">let</span> <span class="k">mut</span> <span class="n">out</span> <span class="o">=</span> <span class="nn">Vec</span><span class="p">::</span><span class="nf">new</span><span class="p">();</span>
+    <span class="n">obj</span><span class="nf">.emit</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span> <span class="n">out</span><span class="p">)</span><span class="nf">.unwrap</span><span class="p">();</span>
+
+    <span class="n">out</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Now if we compile everything:</p>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>cargo run <span class="nt">-p</span> singlepass-compiler <span class="nt">--</span> ../programs/factor.bf
+    Finished dev <span class="o">[</span>unoptimized + debuginfo] target<span class="o">(</span>s<span class="o">)</span> <span class="k">in </span>0.03s
+     Running <span class="sb">`</span>../target/debug/singlepass-compiler programs/factor.bf<span class="sb">`</span>
+<span class="nv">$ </span>rustc <span class="nt">--crate-type</span><span class="o">=</span>staticlib bf_lib.rs
+<span class="nv">$ </span>gcc factor.o libbf_lib.a <span class="nt">-nostartfiles</span> <span class="nt">-pthread</span> <span class="nt">-ldl</span> <span class="nt">-o</span> <span class="nb">factor</span>
+<span class="nv">$ </span>./factor
+123456
+123456: 2 2 2 2 2 2 3 643
+</code></pre></div></div>
+
+<p>It works! Cool!</p>
+<h1 id="a-windows-port">
+  
+  
+    A Windows Port&nbsp<a href="#a-windows-port" class="anchor">§</a>
+  
+  
+</h1>
+    
+
+<p>Following the spirit of the precious parts, let’s now try porting our compiler
+to Windows!</p>
+
+<p>At first, it is very straightforward. In the compiler, we need to tell <code class="language-plaintext highlighter-rouge">object</code> to
+crate a COFF object file on Windows, and we also need to replace the symbol
+<code class="language-plaintext highlighter-rouge">_start</code> by <code class="language-plaintext highlighter-rouge">WinMain</code>, which is the one used as entry point on Windows.</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">let</span> <span class="p">(</span><span class="n">format</span><span class="p">,</span> <span class="n">entry_name</span><span class="p">)</span> <span class="o">=</span> <span class="k">if</span> <span class="nd">cfg!</span><span class="p">(</span><span class="n">target_os</span> <span class="o">=</span> <span class="s">"windows"</span><span class="p">)</span> <span class="p">{</span>
+    <span class="p">(</span><span class="nn">object</span><span class="p">::</span><span class="nn">BinaryFormat</span><span class="p">::</span><span class="n">Coff</span><span class="p">,</span> <span class="s">"WinMain"</span><span class="p">)</span>
+<span class="p">}</span> <span class="k">else</span> <span class="k">if</span> <span class="nd">cfg!</span><span class="p">(</span><span class="n">target_os</span> <span class="o">=</span> <span class="s">"linux"</span><span class="p">)</span> <span class="p">{</span>
+    <span class="p">(</span><span class="nn">object</span><span class="p">::</span><span class="nn">BinaryFormat</span><span class="p">::</span><span class="n">Elf</span><span class="p">,</span> <span class="s">"_start"</span><span class="p">)</span>
+<span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+    <span class="nd">unimplemented!</span><span class="p">(</span><span class="s">"Only Linux and Windows are implemented"</span><span class="p">)</span>
+<span class="p">};</span>
+<span class="k">let</span> <span class="n">entry_name</span> <span class="o">=</span> <span class="n">entry_name</span><span class="nf">.as_bytes</span><span class="p">();</span>
+
+<span class="k">let</span> <span class="k">mut</span> <span class="n">obj</span> <span class="o">=</span> <span class="nn">object</span><span class="p">::</span><span class="nn">write</span><span class="p">::</span><span class="nn">Object</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span>
+    <span class="n">format</span><span class="p">,</span>
+    <span class="nn">object</span><span class="p">::</span><span class="nn">Architecture</span><span class="p">::</span><span class="n">X86_64</span><span class="p">,</span>
+    <span class="nn">object</span><span class="p">::</span><span class="nn">Endianness</span><span class="p">::</span><span class="n">Little</span><span class="p">,</span>
+<span class="p">);</span>
+
+<span class="k">let</span> <span class="k">mut</span> <span class="n">add_symbol</span> <span class="o">=</span> <span class="p">|</span><span class="n">name</span><span class="p">:</span> <span class="o">&amp;</span><span class="p">[</span><span class="nb">u8</span><span class="p">]|</span> <span class="p">{</span> <span class="cm">/* ... */</span> <span class="p">};</span>
+
+<span class="k">let</span> <span class="n">start</span> <span class="o">=</span> <span class="nf">add_symbol</span><span class="p">(</span><span class="n">entry_name</span><span class="p">);</span>
+<span class="c">// ...</span>
+</code></pre></div></div>
+
+<p>Then, if we use the <code class="language-plaintext highlighter-rouge">x86_64-pc-windows-gnu</code> target, we can continue to link our
+objects with GCC:</p>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="o">&gt;</span> rustc <span class="nt">--crate-type</span> staticlib bf_lib.rs <span class="nt">--target</span><span class="o">=</span>x86_64-pc-windows-gnu
+<span class="o">&gt;</span> cargo run <span class="nt">-p</span> singlepass-compiler <span class="nt">--</span> ../programs/factor.bf
+    Finished dev <span class="o">[</span>unoptimized + debuginfo] target<span class="o">(</span>s<span class="o">)</span> <span class="k">in </span>0.17s
+     Running <span class="sb">`</span>..<span class="se">\t</span>arget<span class="se">\d</span>ebug<span class="se">\s</span>inglepass-compiler.exe ../programs/factor.bf<span class="sb">`</span>
+<span class="o">&gt;</span> gcc <span class="nt">-o</span> factor.exe factor.o libbf_lib.a <span class="nt">-nostartfiles</span> <span class="nt">-ladvapi32</span> <span class="nt">-luserenv</span> <span class="nt">-lkernel32</span> <span class="nt">-lkernel32</span> <span class="nt">-lws2_32</span> <span class="nt">-lbcrypt</span>
+<span class="o">&gt;</span> factor.exe
+
+</code></pre></div></div>
+
+<p>If you test the executable now, you may notice that nothing happens. And if you
+open it on a debugger, you will notice that it is actually crashing on an access
+violation when clearing the first byte of the memory.</p>
+
+<p>What is happening here is that, on Windows, only part of the reserved stack
+space is actually committed. When I tested it, for example, there were only
+12 KiB of accessible space on the stack.</p>
+
+<p>But at the end of the committed stack, there are <a href="https://devblogs.microsoft.com/oldnewthing/20220203-00/?p=106215">guard pages</a>, that whenever
+they are accessed, more pages are allocated for the stack. Pages have a size of
+4096 bytes, but we are allocating 30000 bytes on the stack, which is causing us
+to miss the guard page, and access uncommitted memory.</p>
+
+<p>The fix for this is very simple, we only need to make sure to not miss the guard
+page. An easy change is to start clearing our memory at the bottom end of the
+stack:</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nd">dynasm!</span> <span class="p">{</span> <span class="n">code</span>
+    <span class="p">;</span> <span class="py">.arch</span> <span class="n">x64</span>
+    <span class="p">;</span> <span class="n">push</span> <span class="n">rbp</span>
+    <span class="p">;</span> <span class="n">mov</span> <span class="n">rbp</span><span class="p">,</span> <span class="n">rsp</span>
+    <span class="p">;</span> <span class="n">xor</span> <span class="n">r13</span><span class="p">,</span> <span class="n">r13</span>
+
+    <span class="c">// allocate 30_0000 bytes on stack for the memory</span>
+    <span class="p">;</span> <span class="n">sub</span> <span class="n">rsp</span><span class="p">,</span> <span class="mi">30_000</span>
+    <span class="p">;</span> <span class="n">mov</span> <span class="n">r12</span><span class="p">,</span> <span class="n">rsp</span>
+
+    <span class="c">// zero the memory</span>
+    <span class="p">;</span> <span class="n">xor</span> <span class="n">eax</span><span class="p">,</span> <span class="n">eax</span>
+    <span class="p">;</span> <span class="n">mov</span> <span class="n">r11</span><span class="p">,</span> <span class="n">rbp</span>
+    <span class="p">;</span> <span class="n">loop_</span><span class="p">:</span>
+    <span class="p">;</span> <span class="n">add</span> <span class="n">r11</span><span class="p">,</span> <span class="o">-</span><span class="mi">8</span>
+    <span class="p">;</span> <span class="n">mov</span> <span class="n">QWORD</span> <span class="p">[</span><span class="n">r11</span><span class="p">],</span> <span class="n">rax</span>
+    <span class="p">;</span> <span class="n">cmp</span> <span class="n">r11</span><span class="p">,</span> <span class="n">r12</span>
+    <span class="p">;</span> <span class="n">jne</span> <span class="o">&lt;</span><span class="n">loop_</span>
+<span class="p">};</span>
+</code></pre></div></div>
+
+<p>If we test our program now:</p>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="o">&gt;</span> rustc <span class="nt">--crate-type</span> staticlib bf_lib.rs <span class="nt">--target</span><span class="o">=</span>x86_64-pc-windows-gnu
+<span class="o">&gt;</span> cargo run <span class="nt">-p</span> singlepass-compiler <span class="nt">--</span> ../programs/factor.bf <span class="nt">-o</span>
+    Finished dev <span class="o">[</span>unoptimized + debuginfo] target<span class="o">(</span>s<span class="o">)</span> <span class="k">in </span>0.17s
+     Running <span class="sb">`</span>..<span class="se">\t</span>arget<span class="se">\d</span>ebug<span class="se">\s</span>inglepass-compiler.exe ../programs/factor.bf<span class="sb">`</span>
+<span class="o">&gt;</span> gcc <span class="nt">-o</span> factor.exe factor.o libbf_lib.a <span class="nt">-nostartfiles</span> <span class="nt">-ladvapi32</span> <span class="nt">-luserenv</span> <span class="nt">-lkernel32</span> <span class="nt">-lkernel32</span> <span class="nt">-lws2_32</span> <span class="nt">-lbcrypt</span>
+<span class="o">&gt;</span> factor.exe
+123456
+123456: 2 2 2 2 2 2 3 643
+</code></pre></div></div>
+
+<p>It works!</p>
+
+<p>We can also use the <code class="language-plaintext highlighter-rouge">msvc</code> tool chain. If we open a “Developer Command Prompt
+for VS 22” (I have the Visual Studio 2022 installed), we can run the following:</p>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="o">&gt;</span> rustc <span class="nt">--crate-type</span> staticlib bf_lib.rs <span class="nt">--target</span><span class="o">=</span>x86_64-pc-windows-msvc <span class="nt">-Copt-level</span><span class="o">=</span>2 <span class="nt">-Clto</span> <span class="nt">-Cpanic</span><span class="o">=</span>abort
+<span class="o">&gt;</span> <span class="nb">link</span> /subsystem:console /entry:WinMain advapi32.lib advapi32.lib userenv.lib kernel32.lib kernel32.lib ws2_32.lib bcrypt.lib msvcrt.lib vcruntime.lib factor.o bf_lib.lib
+Microsoft <span class="o">(</span>R<span class="o">)</span> Incremental Linker Version 14.33.31629.0
+Copyright <span class="o">(</span>C<span class="o">)</span> Microsoft Corporation.  All rights reserved.
+
+bf_lib.lib<span class="o">(</span>bf_lib.bf_lib.58e9fd71-cgu.2.rcgu.o<span class="o">)</span> : warning LNK4210: .CRT section exists<span class="p">;</span> there may be unhandled static initializers or terminators
+msvcrt.lib<span class="o">(</span>tlssup.obj<span class="o">)</span> : warning LNK4210: .CRT section exists<span class="p">;</span> there may be unhandled static initializers or terminators
+bf_lib.lib<span class="o">(</span>bf_lib.bf_lib.58e9fd71-cgu.2.rcgu.o<span class="o">)</span> : warning LNK4210: .CRT section exists<span class="p">;</span> there may be unhandled static initializers or terminators
+msvcrt.lib<span class="o">(</span>tlssup.obj<span class="o">)</span> : warning LNK4210: .CRT section exists<span class="p">;</span> there may be
+unhandled static initializers or terminators
+
+<span class="o">&gt;</span> factor.exe
+123456
+123456: 2 2 2 2 2 2 3 643
+</code></pre></div></div>
+
+<p>I needed to include <code class="language-plaintext highlighter-rouge">vcruntime.lib</code>, even though <code class="language-plaintext highlighter-rouge">--print=static-native-libs</code>
+didn’t report that it was used. Even so, there were some unresolved symbols, but
+thankfully by setting <code class="language-plaintext highlighter-rouge">panic=abort</code>, enabling LTO and increasing the
+optimization level, these symbols have gone away.</p>
+
+<p>It still outputs some warnings about unhandled static initializers, but
+thankfully our program don’t need them (I think), and everything works!</p>
+<h1 id="future-work">
+  
+  
+    Future work&nbsp<a href="#future-work" class="anchor">§</a>
+  
+  
+</h1>
+    
+
+<p>In this post we have seen the basic of object files, and how compile our
+programs to them, and them link them. But we only covered the very basic of
+this. There still things that we didn’t cover, like dynamic libraries, position independent
+executables, debug information, etc.</p>
+
+<p>Also, all these file formats are system dependent, and the relocations in them
+vary greatly between architectures, so we again fall in the same problem that we
+discussed in the end of part 2. Thankfully code generators, like LLVM, also
+covers these problems.</p>
+
+<p>A natural next step here would be to try exactly that using the Cranelift JIT
+compiler that we made in the last part as basis. You can use
+<a href="https://docs.rs/cranelift-module/latest/cranelift_module/"><code class="language-plaintext highlighter-rouge">cranelift-module</code></a> and <a href="https://docs.rs/cranelift-object/latest/cranelift_object/"><code class="language-plaintext highlighter-rouge">cranelift-object</code></a> to do that.</p>
+
+<p>But this will be the last part of this blog post series. There is much more to
+explore on compilation, but brainfuck is too simple a language for them to be
+need.</p>
+
+<p>But hopefully, these series has taught you at least the basics to let you be
+able to start writing your own compilers if the will ever came.</p>
+
+<p>All the code developed during these series <a href="https://github.com/Rodrigodd/bf-compiler">can be found here</a> (but it
+may not contain the exactly snippets showed here).</p>
+
+<div class="footnotes" role="doc-endnotes">
+  <ol>
+    <li id="fn:actually_is_zeroed" role="doc-endnote">
+      <p>Actually, on Linux, fresh allocated stack for a process
+is initially zeroed, and because we are the first function being executed (we
+are at the entry point) we can make sure that the memory is already clear. But
+I cleared it anyway, because it will be useful when we port this compiler to
+Windows. <a href="#fnref:actually_is_zeroed" class="reversefootnote" role="doc-backlink">&#8617;</a></p>
+    </li>
+  </ol>
+</div>
+
+  </div><a class="u-url" href="/2022/12/31/bf_compiler-part4.html" hidden></a>
+</article>
+
+      </div>
+    </main><footer class="site-footer h-card">
+  <data class="u-url" href="/"></data>
+
+  <div class="wrapper">
+
+    <div class="footer-col-wrapper">
+      <div class="footer-col">
+        <p class="feed-subscribe">
+          <a href="/feed.xml">
+            <svg class="svg-icon orange">
+              <use xlink:href="/assets/minima-social-icons.svg#rss"></use>
+            </svg><span>Subscribe</span>
+          </a>
+        </p>
+      </div>
+      <div class="footer-col">
+        <p></p>
+      </div>
+    </div>
+
+    <div class="social-links"><ul class="social-media-list"><li>
+  <a rel="me" href="https://github.com/Rodrigodd/Rodrigodd.github.io" target="_blank" title="github">
+    <svg class="svg-icon grey">
+      <use xlink:href="/assets/minima-social-icons.svg#github"></use>
+    </svg>
+  </a>
+</li>
+</ul>
+</div>
+
+  </div>
+
+</footer>
+</body>
+
+</html>

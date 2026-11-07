@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1"><!-- Begin Jekyll SEO tag v2.8.0 -->
+<title>Compiling Brainfuck code - Part 3: A Cranelift JIT Compiler | Rodrigodd</title>
+<meta name="generator" content="Jekyll v3.9.3" />
+<meta property="og:title" content="Compiling Brainfuck code - Part 3: A Cranelift JIT Compiler" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="This is the third post of a blog post series where I will reproduce Eli Bendersky’s Adventures In JIT Compilation series, but this time using the Rust programming language." />
+<meta property="og:description" content="This is the third post of a blog post series where I will reproduce Eli Bendersky’s Adventures In JIT Compilation series, but this time using the Rust programming language." />
+<link rel="canonical" href="https://rodrigodd.github.io/2022/11/26/bf_compiler-part3.html" />
+<meta property="og:url" content="https://rodrigodd.github.io/2022/11/26/bf_compiler-part3.html" />
+<meta property="og:site_name" content="Rodrigodd" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2022-11-26T21:00:00+00:00" />
+<meta name="twitter:card" content="summary" />
+<meta property="twitter:title" content="Compiling Brainfuck code - Part 3: A Cranelift JIT Compiler" />
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","dateModified":"2022-11-26T21:00:00+00:00","datePublished":"2022-11-26T21:00:00+00:00","description":"This is the third post of a blog post series where I will reproduce Eli Bendersky’s Adventures In JIT Compilation series, but this time using the Rust programming language.","headline":"Compiling Brainfuck code - Part 3: A Cranelift JIT Compiler","mainEntityOfPage":{"@type":"WebPage","@id":"https://rodrigodd.github.io/2022/11/26/bf_compiler-part3.html"},"url":"https://rodrigodd.github.io/2022/11/26/bf_compiler-part3.html"}</script>
+<!-- End Jekyll SEO tag -->
+<link rel="stylesheet" href="/assets/css/style.css"><link type="application/atom+xml" rel="alternate" href="https://rodrigodd.github.io/feed.xml" title="Rodrigodd" />
+</head>
+<body><header class="site-header">
+
+  <div class="wrapper"><a class="site-title" rel="author" href="/">Rodrigodd</a><nav class="site-nav">
+        <input type="checkbox" id="nav-trigger" class="nav-trigger" />
+        <label for="nav-trigger">
+          <span class="menu-icon">
+            <svg viewBox="0 0 18 15" width="18px" height="15px">
+              <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.032C17.335,0,18,0.665,18,1.484L18,1.484z M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.032C17.335,6.031,18,6.696,18,7.516L18,7.516z M18,13.516C18,14.335,17.335,15,16.516,15H1.484 C0.665,15,0,14.335,0,13.516l0,0c0-0.82,0.665-1.483,1.484-1.483h15.032C17.335,12.031,18,12.695,18,13.516L18,13.516z"/>
+            </svg>
+          </span>
+        </label>
+
+        <div class="trigger"><a class="page-link" href="/about.html">About</a></div>
+      </nav></div>
+</header>
+<main class="page-content" aria-label="Content">
+      <div class="wrapper">
+        <article class="post h-entry" itemscope itemtype="http://schema.org/BlogPosting">
+
+  <header class="post-header">
+    <h1 class="post-title p-name" itemprop="name headline">Compiling Brainfuck code - Part 3: A Cranelift JIT Compiler</h1>
+    <p class="post-meta"><time class="dt-published" datetime="2022-11-26T21:00:00+00:00" itemprop="datePublished">
+        Nov 26, 2022
+      </time><span style="margin-left: 0.3em; margin-right: 0.3em"> • </span>
+
+    <span class="ert">
+      
+      
+      
+      
+
+      
+      
+      
+
+      
+      15 minutes read
+    </span>
+
+    </p>
+  </header>
+
+  <div class="post-content e-content" itemprop="articleBody">
+    <p>This is the third post of a blog post series where I will reproduce <a href="https://eli.thegreenplace.net/2017/adventures-in-jit-compilation-part-1-an-interpreter">Eli
+Bendersky’s Adventures In JIT Compilation series</a>, but this time using the
+<a href="https://www.rust-lang.org">Rust programming language</a>.</p>
+
+<ul>
+  <li><a href="/2022/10/21/bf_compiler-part1.html">Part 1: An Optimized Interpreter</a></li>
+  <li><a href="/2022/11/07/bf_compiler-part2.html">Part 2: A Singlepass JIT Compiler</a></li>
+  <li><strong>Part 3: A Cranelift JIT Compiler</strong></li>
+  <li><a href="/2022/12/31/bf_compiler-part4.html">Part 4: A Static Compiler</a></li>
+</ul>
+
+<p>In the <a href="/2022/11/07/bf_compiler-part2.html">previous part</a> we made an
+x86 JIT compiler for brainfuck interpreter. In this part we will make a JIT
+compiler using the Cranelift machine code generator.</p>
+<h1 id="what-is-cranelift">
+  
+  
+    What is Cranelift&nbsp<a href="#what-is-cranelift" class="anchor">§</a>
+  
+  
+</h1>
+    
+
+<p><a href="https://docs.rs/cranelift/0.89.2/cranelift/index.html">Cranelift</a> is a machine code generator written in Rust, similar to tools like
+LLVM or GCC’s backend. As briefly discussed at the end of the last part, these
+tools are used to create an abstraction layer between language implementations
+and their compilation targets, by means of a target-independent intermediate
+representation (IR).</p>
+
+<p>This means that instead of each language having a compiler for each target (a
+quadratic amount of work), each language compiler can instead target the code
+generator IR, and the code generator has a backend for each compilation target
+(a linear amount of work).</p>
+
+<p>Furthermore, these tools also take to job of applying all kinds of optimizations
+to the generated machine code, since it allows it to be optimal for each target,
+and also because it improves the performance of dozens of language at once.</p>
+
+<p>But Cranelift has focus on fast compile-time with reasonable runtime
+performance, and it is also not so mature, so it does not produce heavily
+optimized code. It is primarily design as a code generator for WebAssembly, so
+it makes sense to invest more in compile-time speed, where wasm programs are
+compiled constantly, differently from LLVM for example, that is has more focus
+on static compilation, where programs are compiled once and run many times.</p>
+<h1 id="basics-of-cranelift-ir">
+  
+  
+    Basics of Cranelift IR&nbsp<a href="#basics-of-cranelift-ir" class="anchor">§</a>
+  
+  
+</h1>
+    
+
+<p>Using Cranelift boils down to translation our code to Cranelift’s IR (CLIR),
+that later get optimized and compiled down to machine code. In the examples
+below I am showing the CLIR in its textual format, but it is more often
+manipulated in its in-memory data structure format, as we will see in the next
+section.</p>
+
+<p>Cranelift’s IR, similar to many others code generators IR, uses <a href="https://en.wikipedia.org/wiki/Static_single-assignment_form">static
+single-assignment form</a> (SSA), which basically means that there is no
+mutable variables in this representation. Each instruction returns a new value,
+that is only uses as input of subsequent instructions.</p>
+
+<p>This means that a mutable variable in a high level language would be represented
+by different values throughout the program. As example:</p>
+
+<pre><code class="language-clif">; x = 3 * (2 + 4)
+v0 = iconst.i64 3
+v1 = iconst.i64 2
+v2 = iconst.i64 4
+v3 = iadd v1, v2
+v4 = imult v0, v3 // x is in v4
+
+; x = 2*x + 1
+v5 = imult v1, v4
+v6 = iconst 1
+v7 = iadd v5, v6 // now x is in v7
+</code></pre>
+
+<p>These instructions are contained in basic blocks. A <a href="https://en.wikipedia.org/wiki/Basic_block">basic block</a> is sequence of
+instructions, with a single entry at the top, and no branches except at the very
+end. Branches can only target other blocks. In Cranelift the blocks can receive
+arguments that allow passing values between blocks.</p>
+
+<p>To implement an if-else expression for example, you would need at least four
+blocks, the start block, an if block, an else block and the after block:</p>
+
+<pre><code class="language-clif">// x = if v0 != 0 { 1 } else { 2 }
+block0(v0: i32):
+    brnz v0, block1 // branch if not zero
+    jump block2
+
+block1:
+    v1 = iconst.i32 1
+    jump block3(v1)
+
+block2:
+    v2 = iconst.i32 2
+    jump block3(v2)
+
+block3(v3):
+    // x is in v3
+</code></pre>
+
+<p>A set of basic blocks forms a function, which is the compilation unit of
+Cranelift. A function has a start block, which inherit the function parameters.</p>
+
+<p>But let’s now see how these are generated in practice.</p>
+<h1 id="a-simple-example">
+  
+  
+    A Simple Example&nbsp<a href="#a-simple-example" class="anchor">§</a>
+  
+  
+</h1>
+    
+
+<p>Let’s try compiling the same example that we use in the previous part, the add 1
+function. It receives one parameter, adds 1, and return it. In x86 assembly, it
+was only three instructions:</p>
+
+<div class="language-nasm highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nf">add</span> <span class="nb">rdi</span><span class="p">,</span> <span class="mi">1</span>    <span class="c1">; the argument is in rdi, I add 1 to it.</span>
+<span class="nf">mov</span> <span class="nb">rax</span><span class="p">,</span> <span class="nb">rdi</span>  <span class="c1">; the return value is rax, so I move rdi to rax</span>
+<span class="nf">ret</span>           <span class="c1">; return from the function</span>
+</code></pre></div></div>
+
+<p>We will generate the following correspondent CLIR:</p>
+
+<pre><code class="language-clif">function u0:0(i64) -&gt; i64 system_v {
+block0(v0: i64):
+    v1 = iadd_imm v0, 1
+    return v1
+}
+</code></pre>
+
+<p>For that we need to make use of the <a href="https://docs.rs/cranelift/0.89.2/cranelift/index.html">cranelift</a> crate. That crate is an umbrella
+for two other crates, <a href="https://docs.rs/cranelift-codegen/0.89.2/cranelift_codegen/index.html">cranelift-codegen</a>, the core of Cranelift that actually
+compiles CLIR to machine code, and <a href="https://docs.rs/cranelift-frontend/0.89.2/cranelift_frontend/index.html">cranelift-frontend</a>, that is used to write
+the CLIR.</p>
+
+<p>First we create a <a href="https://docs.rs/cranelift-codegen/0.89.2/cranelift_codegen/ir/function/struct.Function.html"><code class="language-plaintext highlighter-rouge">Function</code></a>, that will contain all our CLIR. For that we need
+to give it a name (for debugging purposes only), and a signature. Its signature
+involves the calling convention (we will use System V, as always) and its
+parameters and returns (Cranelift support functions that return multiple
+values):</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">use</span> <span class="nn">cranelift</span><span class="p">::</span><span class="nn">codegen</span><span class="p">::{</span>
+    <span class="nn">ir</span><span class="p">::{</span><span class="nn">types</span><span class="p">::</span><span class="n">I64</span><span class="p">,</span> <span class="n">AbiParam</span><span class="p">,</span> <span class="n">Function</span><span class="p">,</span> <span class="n">Signature</span><span class="p">},</span>
+    <span class="nn">isa</span><span class="p">::</span><span class="n">CallConv</span><span class="p">,</span>
+<span class="p">};</span>
+
+<span class="k">let</span> <span class="k">mut</span> <span class="n">sig</span> <span class="o">=</span> <span class="nn">Signature</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span><span class="nn">CallConv</span><span class="p">::</span><span class="n">SystemV</span><span class="p">);</span>
+<span class="n">sig</span><span class="py">.params</span><span class="nf">.push</span><span class="p">(</span><span class="nn">AbiParam</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span><span class="n">I64</span><span class="p">));</span>
+<span class="n">sig</span><span class="py">.returns</span><span class="nf">.push</span><span class="p">(</span><span class="nn">AbiParam</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span><span class="n">I64</span><span class="p">));</span>
+
+<span class="k">let</span> <span class="k">mut</span> <span class="n">func</span> <span class="o">=</span> <span class="nn">Function</span><span class="p">::</span><span class="nf">with_name_signature</span><span class="p">(</span><span class="nn">UserFuncName</span><span class="p">::</span><span class="nf">default</span><span class="p">(),</span> <span class="n">sig</span><span class="p">);</span>
+</code></pre></div></div>
+
+<p>To write CLIR to our function we will need a <a href="https://docs.rs/cranelift-frontend/0.89.2/cranelift_frontend/struct.FunctionBuilder.html"><code class="language-plaintext highlighter-rouge">FunctionBuilder</code></a>. First we
+create a <a href="https://docs.rs/cranelift-frontend/0.89.2/cranelift_frontend/struct.FunctionBuilderContext.html"><code class="language-plaintext highlighter-rouge">FunctionBuilderContext</code></a>, that is used to recycle resources between
+the compilation of multiple functions (something we won’t do). Then we pass both
+the <code class="language-plaintext highlighter-rouge">Function</code> and the <code class="language-plaintext highlighter-rouge">FunctionBuilderContext</code> to <code class="language-plaintext highlighter-rouge">FunctionBuilder</code>:</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">use</span> <span class="nn">cranelift</span><span class="p">::</span><span class="nn">frontend</span><span class="p">::{</span><span class="n">FunctionBuilder</span><span class="p">,</span> <span class="n">FunctionBuilderContext</span><span class="p">};</span>
+
+<span class="k">let</span> <span class="k">mut</span> <span class="n">func_ctx</span> <span class="o">=</span> <span class="nn">FunctionBuilderContext</span><span class="p">::</span><span class="nf">new</span><span class="p">();</span>
+<span class="k">let</span> <span class="k">mut</span> <span class="n">builder</span> <span class="o">=</span> <span class="nn">FunctionBuilder</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span> <span class="n">func</span><span class="p">,</span> <span class="o">&amp;</span><span class="k">mut</span> <span class="n">func_ctx</span><span class="p">);</span>
+</code></pre></div></div>
+
+<p>Now we can start the translation! First we create a basic block, that will be
+the entry of our function. We append the parameters of our function to the
+block, and switch to it, allowing us to start writing instruction.</p>
+
+<p>We must also remember to seal our block as soon as all branches to it are
+defined<sup id="fnref:seal" role="doc-noteref"><a href="#fn:seal" class="footnote" rel="footnote">1</a></sup>. Because our function have no branches we can seal it right after
+creating it.</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">let</span> <span class="n">block</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.create_block</span><span class="p">();</span>
+<span class="n">builder</span><span class="nf">.seal_block</span><span class="p">(</span><span class="n">block</span><span class="p">);</span>
+
+<span class="n">builder</span><span class="nf">.append_block_params_for_function_params</span><span class="p">(</span><span class="n">block</span><span class="p">);</span>
+<span class="n">builder</span><span class="nf">.switch_to_block</span><span class="p">(</span><span class="n">block</span><span class="p">);</span>
+</code></pre></div></div>
+
+<p>Now we can start writing instructions. We grab the value of the first (and only)
+parameter of the block, add 1 to it, and return it. And then we can finalize our
+function.</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">let</span> <span class="n">arg</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.block_params</span><span class="p">(</span><span class="n">block</span><span class="p">)[</span><span class="mi">0</span><span class="p">];</span>
+<span class="k">let</span> <span class="n">plus_one</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.iadd_imm</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="mi">1</span><span class="p">);</span>
+<span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.return_</span><span class="p">(</span><span class="o">&amp;</span><span class="p">[</span><span class="n">plus_one</span><span class="p">]);</span>
+
+<span class="n">builder</span><span class="nf">.finalize</span><span class="p">();</span>
+</code></pre></div></div>
+
+<p>With this our function is complete! If we want to debug what we have generated,
+we can print the CLIR:</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nd">println!</span><span class="p">(</span><span class="s">"{}"</span><span class="p">,</span> <span class="n">func</span><span class="nf">.display</span><span class="p">());</span>
+</code></pre></div></div>
+
+<pre><code class="language-clif">function u0:0(i64) -&gt; i64 system_v {
+block0(v0: i64):
+    v1 = iadd_imm v0, 1
+    return v1
+}
+</code></pre>
+
+<p>It is exactly what I have showed at the start of the section (I have copy-pasted
+it there).</p>
+
+<p>Now we only need to compile it. For that we will need to use <a href="https://docs.rs/cranelift-codegen/0.89.2/cranelift_codegen/struct.Context.html"><code class="language-plaintext highlighter-rouge">Context</code></a>, that
+contains everything to compile our function.</p>
+
+<p>First we need to get a <a href="https://docs.rs/cranelift-codegen/0.89.2/cranelift_codegen/isa/trait.TargetIsa.html"><code class="language-plaintext highlighter-rouge">TargetISA</code></a>, that represents the target that we went to
+compile to. We get one by passing a <a href="https://docs.rs/target-lexicon/0.12.5/target_lexicon/struct.Triple.html"><code class="language-plaintext highlighter-rouge">Triple</code></a> from the <a href="https://docs.rs/target-lexicon/0.12.5/target_lexicon/index.html"><code class="language-plaintext highlighter-rouge">target_lexicon</code></a> crate
+to <code class="language-plaintext highlighter-rouge">isa::lookup</code>. We will use <code class="language-plaintext highlighter-rouge">Tiple::host()</code> to get the native ISA of our host
+(because we will run on it right after). In out case this is an x86-64 target.</p>
+
+<p>The <code class="language-plaintext highlighter-rouge">TargetISA</code> also receives a <code class="language-plaintext highlighter-rouge">settings::Flags</code>, that contains some
+compilations settings, like the level of optimization.</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">use</span> <span class="nn">cranelift</span><span class="p">::</span><span class="nn">codegen</span><span class="p">::{</span><span class="n">isa</span><span class="p">,</span> <span class="n">settings</span><span class="p">};</span>
+<span class="k">use</span> <span class="nn">target_lexicon</span><span class="p">::</span><span class="n">Triple</span><span class="p">;</span>
+
+<span class="k">let</span> <span class="n">builder</span> <span class="o">=</span> <span class="nn">settings</span><span class="p">::</span><span class="nf">builder</span><span class="p">();</span>
+<span class="k">let</span> <span class="n">flags</span> <span class="o">=</span> <span class="nn">settings</span><span class="p">::</span><span class="nn">Flags</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span><span class="n">builder</span><span class="p">);</span>
+
+<span class="k">let</span> <span class="n">isa</span> <span class="o">=</span> <span class="k">match</span> <span class="nn">isa</span><span class="p">::</span><span class="nf">lookup</span><span class="p">(</span><span class="nn">Triple</span><span class="p">::</span><span class="nf">host</span><span class="p">())</span> <span class="p">{</span>
+    <span class="nf">Err</span><span class="p">(</span><span class="n">err</span><span class="p">)</span> <span class="k">=&gt;</span> <span class="nd">panic!</span><span class="p">(</span><span class="s">"Error looking up target: {}"</span><span class="p">,</span> <span class="n">err</span><span class="p">),</span>
+    <span class="nf">Ok</span><span class="p">(</span><span class="n">isa_builder</span><span class="p">)</span> <span class="k">=&gt;</span> <span class="n">isa_builder</span><span class="nf">.finish</span><span class="p">(</span><span class="n">flags</span><span class="p">)</span><span class="nf">.unwrap</span><span class="p">(),</span>
+<span class="p">};</span>
+</code></pre></div></div>
+
+<p>Now we can compile our function:</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">let</span> <span class="k">mut</span> <span class="n">ctx</span> <span class="o">=</span> <span class="nn">Context</span><span class="p">::</span><span class="nf">for_function</span><span class="p">(</span><span class="n">func</span><span class="p">);</span>
+<span class="k">let</span> <span class="n">code</span> <span class="o">=</span> <span class="n">ctx</span><span class="nf">.compile</span><span class="p">(</span><span class="o">&amp;*</span><span class="n">isa</span><span class="p">)</span><span class="nf">.unwrap</span><span class="p">();</span>
+</code></pre></div></div>
+
+<p>This returns a <a href="https://docs.rs/cranelift-codegen/0.89.2/cranelift_codegen/type.CompiledCode.html"><code class="language-plaintext highlighter-rouge">CompileCode</code></a> struct, the machine code can be retrieved with
+the <code class="language-plaintext highlighter-rouge">code_buffer</code> method.</p>
+
+<p>Now to run it, we can do the same process as we have done in the last part.
+But instead of using raw <code class="language-plaintext highlighter-rouge">libc</code> calls, lets use <a href="https://docs.rs/memmap2/0.5.8/memmap2/index.html"><code class="language-plaintext highlighter-rouge">memmap2</code></a>’s safe and
+cross-platform abstractions instead:</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">let</span> <span class="k">mut</span> <span class="n">buffer</span> <span class="o">=</span> <span class="nn">memmap2</span><span class="p">::</span><span class="nn">MmapOptions</span><span class="p">::</span><span class="nf">new</span><span class="p">()</span>
+    <span class="nf">.len</span><span class="p">(</span><span class="n">code</span><span class="nf">.len</span><span class="p">())</span>
+    <span class="nf">.map_anon</span><span class="p">()</span>
+    <span class="nf">.unwrap</span><span class="p">();</span>
+
+<span class="n">buffer</span><span class="nf">.copy_from_slice</span><span class="p">(</span><span class="n">code</span><span class="nf">.code_buffer</span><span class="p">());</span>
+
+<span class="k">let</span> <span class="n">buffer</span> <span class="o">=</span> <span class="n">buffer</span><span class="nf">.make_exec</span><span class="p">()</span><span class="nf">.unwrap</span><span class="p">();</span>
+
+<span class="k">let</span> <span class="n">x</span> <span class="o">=</span> <span class="k">unsafe</span> <span class="p">{</span>
+    <span class="k">let</span> <span class="n">code_fn</span><span class="p">:</span> <span class="k">unsafe</span> <span class="k">extern</span> <span class="s">"sysv64"</span> <span class="k">fn</span><span class="p">(</span><span class="nb">usize</span><span class="p">)</span> <span class="k">-&gt;</span> <span class="nb">usize</span> <span class="o">=</span>
+        <span class="nn">std</span><span class="p">::</span><span class="nn">mem</span><span class="p">::</span><span class="nf">transmute</span><span class="p">(</span><span class="n">buffer</span><span class="nf">.as_ptr</span><span class="p">());</span>
+
+    <span class="nf">code_fn</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+<span class="p">};</span>
+
+<span class="nd">println!</span><span class="p">(</span><span class="s">"out: {}"</span><span class="p">,</span> <span class="n">x</span><span class="p">);</span>
+</code></pre></div></div>
+
+<p>And if we run the code it prints 2! It works!</p>
+
+<p>But is the generated code any good? Let’s take a look at it. You can use
+<code class="language-plaintext highlighter-rouge">ctx.set_disasm(true)</code> and <code class="language-plaintext highlighter-rouge">code.disasm</code> to get a disassembly generated by
+Cranelift, which also contains some extra debug information. But it uses AT&amp;T
+syntax, and in this series I am using Intel syntax, so I will save the code to a
+file and disassemble it with objdump:</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nn">std</span><span class="p">::</span><span class="nn">fs</span><span class="p">::</span><span class="nf">write</span><span class="p">(</span><span class="s">"dump.bin"</span><span class="p">,</span> <span class="n">code</span><span class="nf">.code_buffer</span><span class="p">())</span><span class="nf">.unwrap</span><span class="p">();</span>
+</code></pre></div></div>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>objdump <span class="nt">-b</span> binary <span class="nt">-D</span> <span class="nt">-M</span> intel,x86-64 <span class="nt">-m</span> i386:x86-64 dump.bin
+
+dump.bin:     file format binary
+
+
+Disassembly of section .data:
+
+0000000000000000 &lt;.data&gt;:
+   0:   55                      push   rbp
+   1:   48 89 e5                mov    rbp,rsp
+   4:   48 89 f8                mov    rax,rdi
+   7:   48 83 c0 01             add    rax,0x1
+   b:   48 89 ec                mov    rsp,rbp
+   e:   5d                      pop    rbp
+   f:   c3                      ret
+</code></pre></div></div>
+
+<p>As we can see, if you ignore the pushes and moves use for setting up the stack
+frame, it generated machine code pretty close to what we have done before.</p>
+
+<p>It is cool that Cranelift also takes care of generating the code for setting up
+the stack frame, but it is not so necessary for leaf functions like this, even
+more for such small function.</p>
+
+<p>And in fact, Cranelift is supposed to do that, but this is currently not
+implemented for x86 (see <a href="https://github.com/bytecodealliance/wasmtime/issues/1148">issue #1148</a>). But it appears to be implemented for
+AArch64…</p>
+
+<p>So, let’s take a look at AArch64 output! We need to enable the “arm64” features
+of cranelift-codegen:</p>
+
+<div class="language-toml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># make sure both are in the same version</span>
+<span class="py">cranelift</span> <span class="p">=</span> <span class="s">"0.89.2"</span>
+<span class="nn">cranelift-codegen</span> <span class="o">=</span> <span class="p">{</span> <span class="py">version</span> <span class="p">=</span> <span class="s">"0.89.2"</span><span class="p">,</span> <span class="py">features</span> <span class="p">=</span> <span class="nn">["arm64"]</span> <span class="p">}</span>
+</code></pre></div></div>
+
+<p>And change the target ISA to AArch64:</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">use</span> <span class="nn">target_lexicon</span><span class="p">::</span><span class="n">triple</span><span class="p">;</span>
+<span class="k">use</span> <span class="nn">std</span><span class="p">::</span><span class="nn">str</span><span class="p">::</span><span class="n">FromStr</span><span class="p">,</span>
+
+<span class="k">let</span> <span class="n">isa</span> <span class="o">=</span> <span class="k">match</span> <span class="nn">isa</span><span class="p">::</span><span class="nf">lookup</span><span class="p">(</span><span class="nd">triple!</span><span class="p">(</span><span class="s">"aarch64"</span><span class="p">))</span> <span class="p">{</span>
+    <span class="nf">Err</span><span class="p">(</span><span class="n">err</span><span class="p">)</span> <span class="k">=&gt;</span> <span class="nd">panic!</span><span class="p">(</span><span class="s">"Error looking up target: {}"</span><span class="p">,</span> <span class="n">err</span><span class="p">),</span>
+    <span class="nf">Ok</span><span class="p">(</span><span class="n">isa_builder</span><span class="p">)</span> <span class="k">=&gt;</span> <span class="n">isa_builder</span><span class="nf">.finish</span><span class="p">(</span><span class="n">flags</span><span class="p">)</span><span class="nf">.unwrap</span><span class="p">(),</span>
+<span class="p">};</span>
+</code></pre></div></div>
+
+<p>Of course, we can no longer execute the code, but we can disassemble its output:</p>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>aarch64-linux-gnu-objdump <span class="nt">-b</span> binary <span class="nt">-maarch64</span> <span class="nt">-D</span> dump.bin
+
+dump.bin:     file format binary
+
+
+Disassembly of section .data:
+
+0000000000000000 &lt;.data&gt;:
+   0:   91000400        add     x0, x0, <span class="c">#0x1</span>
+   4:   d65f03c0        ret
+</code></pre></div></div>
+
+<p>And look! Only two instructions, no useless stack frame allocation!</p>
+
+<p>Another thing we can look at is what happens when non-optimal code is emitted,
+for example, if I add 1 two times, one after the other, as we will do in the
+brainfuck compiler. Could Cranelift be able to optimized it to a single add?</p>
+
+<p>First, let’s enable Cranelift optimizations. For this, we need to use the
+<code class="language-plaintext highlighter-rouge">settings::builder()</code>, that was used for creating the compiler flags:</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">let</span> <span class="k">mut</span> <span class="n">builder</span> <span class="o">=</span> <span class="nn">settings</span><span class="p">::</span><span class="nf">builder</span><span class="p">();</span>
+<span class="n">builder</span><span class="nf">.set</span><span class="p">(</span><span class="s">"opt_level"</span><span class="p">,</span> <span class="s">"speed"</span><span class="p">)</span><span class="nf">.unwrap</span><span class="p">();</span>
+<span class="k">let</span> <span class="n">flags</span> <span class="o">=</span> <span class="nn">settings</span><span class="p">::</span><span class="nn">Flags</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span><span class="n">builder</span><span class="p">);</span>
+</code></pre></div></div>
+
+<p>Now we can emit some non-optimal code:</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">let</span> <span class="n">arg</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.block_params</span><span class="p">(</span><span class="n">block</span><span class="p">)[</span><span class="mi">0</span><span class="p">];</span>
+<span class="k">let</span> <span class="n">plus_one</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.iadd_imm</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="mi">1</span><span class="p">);</span>
+<span class="k">let</span> <span class="n">plus_two</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.iadd_imm</span><span class="p">(</span><span class="n">plus_one</span><span class="p">,</span> <span class="mi">1</span><span class="p">);</span>
+<span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.return_</span><span class="p">(</span><span class="o">&amp;</span><span class="p">[</span><span class="n">plus_two</span><span class="p">]);</span>
+</code></pre></div></div>
+
+<p>And if we run again and disassemble:</p>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>objdump <span class="nt">-b</span> binary <span class="nt">-D</span> <span class="nt">-M</span> intel,x86-64 <span class="nt">-m</span> i386:x86-64 dump.bin
+
+0000000000000000 &lt;.data&gt;:
+   0:   55                      push   rbp
+   1:   48 89 e5                mov    rbp,rsp
+   4:   48 89 f8                mov    rax,rdi
+   7:   83 c0 02                add    eax,0x2
+   a:   48 89 ec                mov    rsp,rbp
+   d:   5d                      pop    rbp
+   e:   c3                      ret
+</code></pre></div></div>
+
+<p>Hey, look! A single <code class="language-plaintext highlighter-rouge">add eax, 2</code>. It automatically optimized the code for us!</p>
+<h1 id="a-cranelift-compiler">
+  
+  
+    A Cranelift Compiler&nbsp<a href="#a-cranelift-compiler" class="anchor">§</a>
+  
+  
+</h1>
+    
+
+<p>Now we can finally start compiling brainfuck. But first we need to take care of
+some details.</p>
+
+<p>First, the SSA don’t have mutable values, but brainfuck has a mutable variable,
+the cell pointer (the mutability of the memory itself will be represented by
+load/store instructions). So we would need to somehow keep track of what value
+is the current value of pointer, and keeping passing it between blocks.</p>
+
+<p>But thankfully, <code class="language-plaintext highlighter-rouge">codegen-frontend</code> already have a functionality that
+automatically manages variables. We only need to create a <code class="language-plaintext highlighter-rouge">Variable</code>, and
+declared inside our <code class="language-plaintext highlighter-rouge">builder</code>. Whenever we need its value, we call
+<code class="language-plaintext highlighter-rouge">builder.use_var</code>, and when we need to set it we call <code class="language-plaintext highlighter-rouge">builder.def_var</code>.</p>
+
+<p>And second, we were using <code class="language-plaintext highlighter-rouge">I64</code> as the type of our values in the last example,
+but for the pointer it should have the pointer type of our current target ISA
+(as we may change the compilation target later). We can get it by calling
+<code class="language-plaintext highlighter-rouge">isa.pointer_type()</code>.</p>
+
+<p>With all this together, we can start writing our compiler:</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">struct</span> <span class="n">Program</span> <span class="p">{</span>
+    <span class="n">code</span><span class="p">:</span> <span class="nb">Vec</span><span class="o">&lt;</span><span class="nb">u8</span><span class="o">&gt;</span><span class="p">,</span>
+    <span class="n">memory</span><span class="p">:</span> <span class="p">[</span><span class="nb">u8</span><span class="p">;</span> <span class="mi">30_000</span><span class="p">],</span>
+<span class="p">}</span>
+<span class="k">impl</span> <span class="n">Program</span> <span class="p">{</span>
+    <span class="k">fn</span> <span class="nf">new</span><span class="p">(</span><span class="n">source</span><span class="p">:</span> <span class="o">&amp;</span><span class="p">[</span><span class="nb">u8</span><span class="p">])</span> <span class="k">-&gt;</span> <span class="n">Result</span><span class="o">&lt;</span><span class="n">Program</span><span class="p">,</span> <span class="n">UnbalancedBrackets</span><span class="o">&gt;</span> <span class="p">{</span>
+        <span class="k">let</span> <span class="k">mut</span> <span class="n">builder</span> <span class="o">=</span> <span class="nn">settings</span><span class="p">::</span><span class="nf">builder</span><span class="p">();</span>
+        <span class="n">builder</span><span class="nf">.set</span><span class="p">(</span><span class="s">"opt_level"</span><span class="p">,</span> <span class="s">"speed"</span><span class="p">)</span><span class="nf">.unwrap</span><span class="p">();</span>
+        <span class="k">let</span> <span class="n">flags</span> <span class="o">=</span> <span class="nn">settings</span><span class="p">::</span><span class="nn">Flags</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span><span class="n">builder</span><span class="p">);</span>
+
+        <span class="k">let</span> <span class="n">isa</span> <span class="o">=</span> <span class="k">match</span> <span class="nn">isa</span><span class="p">::</span><span class="nf">lookup</span><span class="p">(</span><span class="nn">Triple</span><span class="p">::</span><span class="nf">host</span><span class="p">())</span> <span class="p">{</span>
+            <span class="nf">Err</span><span class="p">(</span><span class="mi">_</span><span class="p">)</span> <span class="k">=&gt;</span> <span class="nd">panic!</span><span class="p">(</span><span class="s">"x86_64 ISA is not avaliable"</span><span class="p">),</span>
+            <span class="nf">Ok</span><span class="p">(</span><span class="n">isa_builder</span><span class="p">)</span> <span class="k">=&gt;</span> <span class="n">isa_builder</span><span class="nf">.finish</span><span class="p">(</span><span class="n">flags</span><span class="p">)</span><span class="nf">.unwrap</span><span class="p">(),</span>
+        <span class="p">};</span>
+
+        <span class="c">// we get the `pointer_type` from `isa`</span>
+        <span class="k">let</span> <span class="n">pointer_type</span> <span class="o">=</span> <span class="n">isa</span><span class="nf">.pointer_type</span><span class="p">();</span>
+
+        <span class="c">// receive memory address as parameter, and return pointer to io::Error</span>
+        <span class="k">let</span> <span class="k">mut</span> <span class="n">sig</span> <span class="o">=</span> <span class="nn">Signature</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span><span class="nn">CallConv</span><span class="p">::</span><span class="n">SystemV</span><span class="p">);</span>
+        <span class="n">sig</span><span class="py">.params</span><span class="nf">.push</span><span class="p">(</span><span class="nn">AbiParam</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span><span class="n">pointer_type</span><span class="p">));</span>
+        <span class="n">sig</span><span class="py">.returns</span><span class="nf">.push</span><span class="p">(</span><span class="nn">AbiParam</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span><span class="n">pointer_type</span><span class="p">));</span>
+
+        <span class="k">let</span> <span class="k">mut</span> <span class="n">func</span> <span class="o">=</span> <span class="nn">Function</span><span class="p">::</span><span class="nf">with_name_signature</span><span class="p">(</span><span class="nn">UserFuncName</span><span class="p">::</span><span class="nf">user</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="n">sig</span><span class="p">);</span>
+
+        <span class="k">let</span> <span class="k">mut</span> <span class="n">func_ctx</span> <span class="o">=</span> <span class="nn">FunctionBuilderContext</span><span class="p">::</span><span class="nf">new</span><span class="p">();</span>
+        <span class="k">let</span> <span class="k">mut</span> <span class="n">builder</span> <span class="o">=</span> <span class="nn">FunctionBuilder</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span> <span class="n">func</span><span class="p">,</span> <span class="o">&amp;</span><span class="k">mut</span> <span class="n">func_ctx</span><span class="p">);</span>
+
+        <span class="c">// create the variable `pointer` (it is a offset from memory address)</span>
+        <span class="k">let</span> <span class="n">pointer</span> <span class="o">=</span> <span class="nn">Variable</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
+        <span class="n">builder</span><span class="nf">.declare_var</span><span class="p">(</span><span class="n">pointer</span><span class="p">,</span> <span class="n">pointer_type</span><span class="p">);</span>
+
+        <span class="k">let</span> <span class="n">block</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.create_block</span><span class="p">();</span>
+        <span class="n">builder</span><span class="nf">.seal_block</span><span class="p">(</span><span class="n">block</span><span class="p">);</span>
+
+        <span class="n">builder</span><span class="nf">.append_block_params_for_function_params</span><span class="p">(</span><span class="n">block</span><span class="p">);</span>
+        <span class="n">builder</span><span class="nf">.switch_to_block</span><span class="p">(</span><span class="n">block</span><span class="p">);</span>
+
+        <span class="k">let</span> <span class="n">memory_address</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.block_params</span><span class="p">(</span><span class="n">block</span><span class="p">)[</span><span class="mi">0</span><span class="p">];</span>
+
+        <span class="c">// initialize pointer to 0 </span>
+        <span class="k">let</span> <span class="n">zero</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.iconst</span><span class="p">(</span><span class="n">pointer_type</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+        <span class="n">builder</span><span class="nf">.def_var</span><span class="p">(</span><span class="n">pointer</span><span class="p">,</span> <span class="n">zero</span><span class="p">);</span>
+
+        <span class="k">let</span> <span class="k">mut</span> <span class="n">stack</span> <span class="o">=</span> <span class="nn">Vec</span><span class="p">::</span><span class="nf">new</span><span class="p">();</span>
+
+        <span class="k">for</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span> <span class="n">in</span> <span class="n">source</span><span class="nf">.iter</span><span class="p">()</span><span class="nf">.enumerate</span><span class="p">()</span> <span class="p">{</span>
+            <span class="k">match</span> <span class="n">b</span> <span class="p">{</span>
+                <span class="n">b</span><span class="sc">'+'</span> <span class="k">=&gt;</span> <span class="nd">todo!</span><span class="p">(),</span>
+                <span class="n">b</span><span class="sc">'-'</span> <span class="k">=&gt;</span> <span class="nd">todo!</span><span class="p">(),</span>
+                <span class="n">b</span><span class="sc">'.'</span> <span class="k">=&gt;</span> <span class="nd">todo!</span><span class="p">(),</span>
+                <span class="n">b</span><span class="sc">','</span> <span class="k">=&gt;</span> <span class="nd">todo!</span><span class="p">(),</span>
+                <span class="n">b</span><span class="sc">'&lt;'</span> <span class="k">=&gt;</span> <span class="nd">todo!</span><span class="p">(),</span>
+                <span class="n">b</span><span class="sc">'&gt;'</span> <span class="k">=&gt;</span> <span class="nd">todo!</span><span class="p">(),</span>
+                <span class="n">b</span><span class="sc">'['</span> <span class="k">=&gt;</span> <span class="nd">todo!</span><span class="p">(),</span>
+                <span class="n">b</span><span class="sc">']'</span> <span class="k">=&gt;</span> <span class="nd">todo!</span><span class="p">(),</span>
+                <span class="mi">_</span> <span class="k">=&gt;</span> <span class="k">continue</span><span class="p">,</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+
+        <span class="k">if</span> <span class="o">!</span><span class="n">stack</span><span class="nf">.is_empty</span><span class="p">()</span> <span class="p">{</span>
+            <span class="k">return</span> <span class="nf">Err</span><span class="p">(</span><span class="nf">UnbalancedBrackets</span><span class="p">(</span><span class="sc">']'</span><span class="p">,</span> <span class="n">source</span><span class="nf">.len</span><span class="p">()));</span>
+        <span class="p">}</span>
+
+        <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.return_</span><span class="p">(</span><span class="o">&amp;</span><span class="p">[</span><span class="n">zero</span><span class="p">]);</span>
+
+        <span class="n">builder</span><span class="nf">.finalize</span><span class="p">();</span>
+
+        <span class="k">let</span> <span class="n">res</span> <span class="o">=</span> <span class="nf">verify_function</span><span class="p">(</span><span class="o">&amp;</span><span class="n">func</span><span class="p">,</span> <span class="o">&amp;*</span><span class="n">isa</span><span class="p">);</span>
+
+        <span class="k">if</span> <span class="k">let</span> <span class="nf">Err</span><span class="p">(</span><span class="n">errors</span><span class="p">)</span> <span class="o">=</span> <span class="n">res</span> <span class="p">{</span>
+            <span class="nd">panic!</span><span class="p">(</span><span class="s">"{}"</span><span class="p">,</span> <span class="n">errors</span><span class="p">);</span>
+        <span class="p">}</span>
+
+        <span class="k">let</span> <span class="k">mut</span> <span class="n">ctx</span> <span class="o">=</span> <span class="nn">Context</span><span class="p">::</span><span class="nf">for_function</span><span class="p">(</span><span class="n">func</span><span class="p">);</span>
+        <span class="k">let</span> <span class="n">code</span> <span class="o">=</span> <span class="k">match</span> <span class="n">ctx</span><span class="nf">.compile</span><span class="p">(</span><span class="o">&amp;*</span><span class="n">isa</span><span class="p">)</span> <span class="p">{</span>
+            <span class="nf">Ok</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">=&gt;</span> <span class="n">x</span><span class="p">,</span>
+            <span class="nf">Err</span><span class="p">(</span><span class="n">err</span><span class="p">)</span> <span class="k">=&gt;</span> <span class="p">{</span>
+                <span class="nd">eprintln!</span><span class="p">(</span><span class="s">"error compiling: {:?}"</span><span class="p">,</span> <span class="n">err</span><span class="p">);</span>
+                <span class="nn">std</span><span class="p">::</span><span class="nn">process</span><span class="p">::</span><span class="nf">exit</span><span class="p">(</span><span class="mi">8</span><span class="p">);</span>
+            <span class="p">}</span>
+        <span class="p">};</span>
+
+        <span class="k">let</span> <span class="n">code</span> <span class="o">=</span> <span class="n">code</span><span class="nf">.code_buffer</span><span class="p">()</span><span class="nf">.to_vec</span><span class="p">();</span>
+
+        <span class="nf">Ok</span><span class="p">(</span><span class="n">Program</span> <span class="p">{</span>
+            <span class="n">code</span><span class="p">,</span>
+            <span class="n">memory</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">;</span> <span class="mi">30_000</span><span class="p">],</span>
+        <span class="p">})</span>
+    <span class="p">}</span>
+</code></pre></div></div>
+
+<p>Now we only need to implement each instruction.</p>
+
+<p>Whenever we need to read the value of the current cell, we will add
+<code class="language-plaintext highlighter-rouge">memory_address</code> with the value of <code class="language-plaintext highlighter-rouge">pointer</code> to get the cell address, and use
+<code class="language-plaintext highlighter-rouge">load.i8</code> to read it. To write it back, we use <code class="language-plaintext highlighter-rouge">store.i8</code>.</p>
+
+<p>These instructions need a <code class="language-plaintext highlighter-rouge">MemFlags</code>, which is used to tell if the memory may
+trap, if it is aligned, etc. Let’s use the default for now:</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">let</span> <span class="n">mem_flags</span> <span class="o">=</span> <span class="nn">MemFlags</span><span class="p">::</span><span class="nf">new</span><span class="p">();</span>
+</code></pre></div></div>
+
+<p>So for the <code class="language-plaintext highlighter-rouge">+</code> and <code class="language-plaintext highlighter-rouge">-</code>, we use <code class="language-plaintext highlighter-rouge">iadd_imm</code>:</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">b</span><span class="sc">'+'</span> <span class="k">=&gt;</span> <span class="p">{</span>
+    <span class="k">let</span> <span class="n">pointer_value</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.use_var</span><span class="p">(</span><span class="n">pointer</span><span class="p">);</span>
+    <span class="k">let</span> <span class="n">cell_address</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.iadd</span><span class="p">(</span><span class="n">memory_address</span><span class="p">,</span> <span class="n">pointer_value</span><span class="p">);</span>
+    <span class="k">let</span> <span class="n">cell_value</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.load</span><span class="p">(</span><span class="n">I8</span><span class="p">,</span> <span class="n">mem_flags</span><span class="p">,</span> <span class="n">cell_address</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+    <span class="k">let</span> <span class="n">cell_value</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.iadd_imm</span><span class="p">(</span><span class="n">cell_value</span><span class="p">,</span> <span class="mi">1</span><span class="p">);</span>
+    <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.store</span><span class="p">(</span><span class="n">mem_flags</span><span class="p">,</span> <span class="n">cell_value</span><span class="p">,</span> <span class="n">cell_address</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+<span class="p">}</span>
+<span class="n">b</span><span class="sc">'-'</span> <span class="k">=&gt;</span> <span class="p">{</span>
+    <span class="k">let</span> <span class="n">pointer_value</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.use_var</span><span class="p">(</span><span class="n">pointer</span><span class="p">);</span>
+    <span class="k">let</span> <span class="n">cell_address</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.iadd</span><span class="p">(</span><span class="n">memory_address</span><span class="p">,</span> <span class="n">pointer_value</span><span class="p">);</span>
+    <span class="k">let</span> <span class="n">cell_value</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.load</span><span class="p">(</span><span class="n">I8</span><span class="p">,</span> <span class="n">mem_flags</span><span class="p">,</span> <span class="n">cell_address</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+    <span class="k">let</span> <span class="n">cell_value</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.iadd_imm</span><span class="p">(</span><span class="n">cell_value</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">);</span>
+    <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.store</span><span class="p">(</span><span class="n">mem_flags</span><span class="p">,</span> <span class="n">cell_value</span><span class="p">,</span> <span class="n">cell_address</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>For <code class="language-plaintext highlighter-rouge">&lt;</code> and <code class="language-plaintext highlighter-rouge">&gt;</code> it is similar, but we also need to wrap around. For that we use
+the <code class="language-plaintext highlighter-rouge">select</code> instruction, that will be compiled down to a conditional move:</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">b</span><span class="sc">'&lt;'</span> <span class="k">=&gt;</span> <span class="p">{</span>
+    <span class="k">let</span> <span class="n">pointer_value</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.use_var</span><span class="p">(</span><span class="n">pointer</span><span class="p">);</span>
+    <span class="k">let</span> <span class="n">pointer_minus</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.iadd_imm</span><span class="p">(</span><span class="n">pointer_value</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">);</span>
+
+    <span class="k">let</span> <span class="n">wrapped</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.iconst</span><span class="p">(</span><span class="n">pointer_type</span><span class="p">,</span> <span class="mi">30_000</span> <span class="o">-</span> <span class="mi">1</span><span class="p">);</span>
+    <span class="k">let</span> <span class="n">pointer_value</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.select</span><span class="p">(</span><span class="n">pointer_value</span><span class="p">,</span> <span class="n">pointer_minus</span><span class="p">,</span> <span class="n">wrapped</span><span class="p">);</span>
+
+    <span class="n">builder</span><span class="nf">.def_var</span><span class="p">(</span><span class="n">pointer</span><span class="p">,</span> <span class="n">pointer_value</span><span class="p">);</span>
+<span class="p">}</span>
+<span class="n">b</span><span class="sc">'&gt;'</span> <span class="k">=&gt;</span> <span class="p">{</span>
+    <span class="k">let</span> <span class="n">pointer_value</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.use_var</span><span class="p">(</span><span class="n">pointer</span><span class="p">);</span>
+    <span class="k">let</span> <span class="n">pointer_plus</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.iadd_imm</span><span class="p">(</span><span class="n">pointer_value</span><span class="p">,</span> <span class="mi">1</span><span class="p">);</span>
+
+    <span class="k">let</span> <span class="n">cmp</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.icmp_imm</span><span class="p">(</span><span class="nn">IntCC</span><span class="p">::</span><span class="n">Equal</span><span class="p">,</span> <span class="n">pointer_plus</span><span class="p">,</span> <span class="mi">30_000</span><span class="p">);</span>
+    <span class="k">let</span> <span class="n">pointer_value</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.select</span><span class="p">(</span><span class="n">cmp</span><span class="p">,</span> <span class="n">zero</span><span class="p">,</span> <span class="n">pointer_plus</span><span class="p">);</span>
+
+    <span class="n">builder</span><span class="nf">.def_var</span><span class="p">(</span><span class="n">pointer</span><span class="p">,</span> <span class="n">pointer_value</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Now for <code class="language-plaintext highlighter-rouge">[</code> and <code class="language-plaintext highlighter-rouge">]</code> we need to start creating blocks. So when we reach a <code class="language-plaintext highlighter-rouge">[</code> we
+create two blocks, one for the inside of the brackets, and another for after it.
+We conditionally jump to one of the blocks based on the current cell value,
+using a <code class="language-plaintext highlighter-rouge">brz</code>/<code class="language-plaintext highlighter-rouge">jump</code> pair of instructions. We switch to the inner block (next
+instructions will be written to it), and we finish by pushing the blocks to the
+stack.</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">b</span><span class="sc">'['</span> <span class="k">=&gt;</span> <span class="p">{</span>
+    <span class="k">let</span> <span class="n">inner_block</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.create_block</span><span class="p">();</span>
+    <span class="k">let</span> <span class="n">after_block</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.create_block</span><span class="p">();</span>
+
+    <span class="k">let</span> <span class="n">pointer_value</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.use_var</span><span class="p">(</span><span class="n">pointer</span><span class="p">);</span>
+    <span class="k">let</span> <span class="n">cell_address</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.iadd</span><span class="p">(</span><span class="n">memory_address</span><span class="p">,</span> <span class="n">pointer_value</span><span class="p">);</span>
+    <span class="k">let</span> <span class="n">cell_value</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.load</span><span class="p">(</span><span class="n">I8</span><span class="p">,</span> <span class="n">mem_flags</span><span class="p">,</span> <span class="n">cell_address</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+
+    <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.brz</span><span class="p">(</span><span class="n">cell_value</span><span class="p">,</span> <span class="n">after_block</span><span class="p">,</span> <span class="o">&amp;</span><span class="p">[]);</span>
+    <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.jump</span><span class="p">(</span><span class="n">inner_block</span><span class="p">,</span> <span class="o">&amp;</span><span class="p">[]);</span>
+
+    <span class="n">builder</span><span class="nf">.switch_to_block</span><span class="p">(</span><span class="n">inner_block</span><span class="p">);</span>
+
+    <span class="n">stack</span><span class="nf">.push</span><span class="p">((</span><span class="n">inner_block</span><span class="p">,</span> <span class="n">after_block</span><span class="p">));</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>On <code class="language-plaintext highlighter-rouge">]</code>, we get the blocks back from the stack, write our conditionally jump
+logic, and switch to the <code class="language-plaintext highlighter-rouge">after_block</code>. Also, at this point we already have
+written all branches to these blocks, so we can seal them.</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">b</span><span class="sc">']'</span> <span class="k">=&gt;</span> <span class="p">{</span>
+    <span class="k">let</span> <span class="p">(</span><span class="n">inner_block</span><span class="p">,</span> <span class="n">after_block</span><span class="p">)</span> <span class="o">=</span> <span class="k">match</span> <span class="n">stack</span><span class="nf">.pop</span><span class="p">()</span> <span class="p">{</span>
+        <span class="nf">Some</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">=&gt;</span> <span class="n">x</span><span class="p">,</span>
+        <span class="nb">None</span> <span class="k">=&gt;</span> <span class="k">return</span> <span class="nf">Err</span><span class="p">(</span><span class="nf">UnbalancedBrackets</span><span class="p">(</span><span class="sc">']'</span><span class="p">,</span> <span class="n">i</span><span class="p">)),</span>
+    <span class="p">};</span>
+
+    <span class="k">let</span> <span class="n">pointer_value</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.use_var</span><span class="p">(</span><span class="n">pointer</span><span class="p">);</span>
+    <span class="k">let</span> <span class="n">cell_address</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.iadd</span><span class="p">(</span><span class="n">memory_address</span><span class="p">,</span> <span class="n">pointer_value</span><span class="p">);</span>
+    <span class="k">let</span> <span class="n">cell_value</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.load</span><span class="p">(</span><span class="n">I8</span><span class="p">,</span> <span class="n">mem_flags</span><span class="p">,</span> <span class="n">cell_address</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+
+    <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.brnz</span><span class="p">(</span><span class="n">cell_value</span><span class="p">,</span> <span class="n">inner_block</span><span class="p">,</span> <span class="o">&amp;</span><span class="p">[]);</span>
+    <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.jump</span><span class="p">(</span><span class="n">after_block</span><span class="p">,</span> <span class="o">&amp;</span><span class="p">[]);</span>
+
+    <span class="n">builder</span><span class="nf">.seal_block</span><span class="p">(</span><span class="n">inner_block</span><span class="p">);</span>
+    <span class="n">builder</span><span class="nf">.seal_block</span><span class="p">(</span><span class="n">after_block</span><span class="p">);</span>
+
+    <span class="n">builder</span><span class="nf">.switch_to_block</span><span class="p">(</span><span class="n">after_block</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>For the <code class="language-plaintext highlighter-rouge">.</code> and <code class="language-plaintext highlighter-rouge">,</code>, we will do something similar to our final single-pass
+compiler of the last part, and implement them in a Rust function, and call them
+from the generated code.</p>
+
+<p>For that we will use the <code class="language-plaintext highlighter-rouge">call_indirect</code> instruction. It needs the function
+signature and address:</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">let</span> <span class="p">(</span><span class="n">write_sig</span><span class="p">,</span> <span class="n">write_address</span><span class="p">)</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="k">let</span> <span class="k">mut</span> <span class="n">write_sig</span> <span class="o">=</span> <span class="nn">Signature</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span><span class="nn">CallConv</span><span class="p">::</span><span class="n">SystemV</span><span class="p">);</span>
+    <span class="n">write_sig</span><span class="py">.params</span><span class="nf">.push</span><span class="p">(</span><span class="nn">AbiParam</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span><span class="n">I8</span><span class="p">));</span>
+    <span class="n">write_sig</span><span class="py">.returns</span><span class="nf">.push</span><span class="p">(</span><span class="nn">AbiParam</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span><span class="n">pointer_type</span><span class="p">));</span>
+    <span class="k">let</span> <span class="n">write_sig</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.import_signature</span><span class="p">(</span><span class="n">write_sig</span><span class="p">);</span>
+
+    <span class="k">let</span> <span class="n">write_address</span> <span class="o">=</span> <span class="n">write</span> <span class="k">as</span> <span class="o">*</span><span class="k">const</span> <span class="p">()</span> <span class="k">as</span> <span class="nb">i64</span><span class="p">;</span>
+    <span class="k">let</span> <span class="n">write_address</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.iconst</span><span class="p">(</span><span class="n">pointer_type</span><span class="p">,</span> <span class="n">write_address</span><span class="p">);</span>
+    <span class="p">(</span><span class="n">write_sig</span><span class="p">,</span> <span class="n">write_address</span><span class="p">)</span>
+<span class="p">};</span>
+
+<span class="k">let</span> <span class="p">(</span><span class="n">read_sig</span><span class="p">,</span> <span class="n">read_address</span><span class="p">)</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="k">let</span> <span class="k">mut</span> <span class="n">read_sig</span> <span class="o">=</span> <span class="nn">Signature</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span><span class="nn">CallConv</span><span class="p">::</span><span class="n">SystemV</span><span class="p">);</span>
+    <span class="n">read_sig</span><span class="py">.params</span><span class="nf">.push</span><span class="p">(</span><span class="nn">AbiParam</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span><span class="n">pointer_type</span><span class="p">));</span>
+    <span class="n">read_sig</span><span class="py">.returns</span><span class="nf">.push</span><span class="p">(</span><span class="nn">AbiParam</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span><span class="n">pointer_type</span><span class="p">));</span>
+    <span class="k">let</span> <span class="n">read_sig</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.import_signature</span><span class="p">(</span><span class="n">read_sig</span><span class="p">);</span>
+
+    <span class="k">let</span> <span class="n">read_address</span> <span class="o">=</span> <span class="n">read</span> <span class="k">as</span> <span class="o">*</span><span class="k">const</span> <span class="p">()</span> <span class="k">as</span> <span class="nb">i64</span><span class="p">;</span>
+    <span class="k">let</span> <span class="n">read_address</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.iconst</span><span class="p">(</span><span class="n">pointer_type</span><span class="p">,</span> <span class="n">read_address</span><span class="p">);</span>
+    <span class="p">(</span><span class="n">read_sig</span><span class="p">,</span> <span class="n">read_address</span><span class="p">)</span>
+<span class="p">};</span>
+</code></pre></div></div>
+
+<p>We also need a block to branch to in case of an error:</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">let</span> <span class="n">exit_block</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.create_block</span><span class="p">();</span>
+<span class="n">builder</span><span class="nf">.append_block_param</span><span class="p">(</span><span class="n">exit_block</span><span class="p">,</span> <span class="n">pointer_type</span><span class="p">);</span>
+</code></pre></div></div>
+
+<p>And right after calling <code class="language-plaintext highlighter-rouge">builder.finalize()</code>:</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">builder</span><span class="nf">.switch_to_block</span><span class="p">(</span><span class="n">exit_block</span><span class="p">);</span>
+<span class="n">builder</span><span class="nf">.seal_block</span><span class="p">(</span><span class="n">exit_block</span><span class="p">);</span>
+
+<span class="k">let</span> <span class="n">result</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.block_params</span><span class="p">(</span><span class="n">exit_block</span><span class="p">)[</span><span class="mi">0</span><span class="p">];</span>
+<span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.return_</span><span class="p">(</span><span class="o">&amp;</span><span class="p">[</span><span class="n">result</span><span class="p">]);</span>
+</code></pre></div></div>
+
+<p>So the operations become:</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">b</span><span class="sc">'.'</span> <span class="k">=&gt;</span> <span class="p">{</span>
+    <span class="k">let</span> <span class="n">pointer_value</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.use_var</span><span class="p">(</span><span class="n">pointer</span><span class="p">);</span>
+    <span class="k">let</span> <span class="n">cell_address</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.iadd</span><span class="p">(</span><span class="n">memory_address</span><span class="p">,</span> <span class="n">pointer_value</span><span class="p">);</span>
+    <span class="k">let</span> <span class="n">cell_value</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.load</span><span class="p">(</span><span class="n">I8</span><span class="p">,</span> <span class="n">mem_flags</span><span class="p">,</span> <span class="n">cell_address</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+
+    <span class="k">let</span> <span class="n">inst</span> <span class="o">=</span> <span class="n">builder</span>
+        <span class="nf">.ins</span><span class="p">()</span>
+        <span class="nf">.call_indirect</span><span class="p">(</span><span class="n">write_sig</span><span class="p">,</span> <span class="n">write_address</span><span class="p">,</span> <span class="o">&amp;</span><span class="p">[</span><span class="n">cell_value</span><span class="p">]);</span>
+    <span class="k">let</span> <span class="n">result</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.inst_results</span><span class="p">(</span><span class="n">inst</span><span class="p">)[</span><span class="mi">0</span><span class="p">];</span>
+
+    <span class="k">let</span> <span class="n">after_block</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.create_block</span><span class="p">();</span>
+
+    <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.brnz</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">exit_block</span><span class="p">,</span> <span class="o">&amp;</span><span class="p">[</span><span class="n">result</span><span class="p">]);</span>
+    <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.jump</span><span class="p">(</span><span class="n">after_block</span><span class="p">,</span> <span class="o">&amp;</span><span class="p">[]);</span>
+
+    <span class="n">builder</span><span class="nf">.seal_block</span><span class="p">(</span><span class="n">after_block</span><span class="p">);</span>
+    <span class="n">builder</span><span class="nf">.switch_to_block</span><span class="p">(</span><span class="n">after_block</span><span class="p">);</span>
+<span class="p">}</span>
+<span class="n">b</span><span class="sc">','</span> <span class="k">=&gt;</span> <span class="p">{</span>
+    <span class="k">let</span> <span class="n">pointer_value</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.use_var</span><span class="p">(</span><span class="n">pointer</span><span class="p">);</span>
+    <span class="k">let</span> <span class="n">cell_address</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.iadd</span><span class="p">(</span><span class="n">memory_address</span><span class="p">,</span> <span class="n">pointer_value</span><span class="p">);</span>
+
+    <span class="k">let</span> <span class="n">inst</span> <span class="o">=</span> <span class="n">builder</span>
+        <span class="nf">.ins</span><span class="p">()</span>
+        <span class="nf">.call_indirect</span><span class="p">(</span><span class="n">read_sig</span><span class="p">,</span> <span class="n">read_address</span><span class="p">,</span> <span class="o">&amp;</span><span class="p">[</span><span class="n">cell_address</span><span class="p">]);</span>
+    <span class="k">let</span> <span class="n">result</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.inst_results</span><span class="p">(</span><span class="n">inst</span><span class="p">)[</span><span class="mi">0</span><span class="p">];</span>
+
+    <span class="k">let</span> <span class="n">after_block</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.create_block</span><span class="p">();</span>
+
+    <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.brnz</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">exit_block</span><span class="p">,</span> <span class="o">&amp;</span><span class="p">[</span><span class="n">result</span><span class="p">]);</span>
+    <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.jump</span><span class="p">(</span><span class="n">after_block</span><span class="p">,</span> <span class="o">&amp;</span><span class="p">[]);</span>
+
+    <span class="n">builder</span><span class="nf">.seal_block</span><span class="p">(</span><span class="n">after_block</span><span class="p">);</span>
+    <span class="n">builder</span><span class="nf">.switch_to_block</span><span class="p">(</span><span class="n">after_block</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>And done! If we run it:</p>
+
+<p><img src="/assets/brainfuck/plot12.svg" alt="" style="display:block; margin-left:auto; margin-right:auto" /></p>
+
+<p>14s, about 4% faster than our single-pass implementation. It is definitely
+faster, but, well, I was hoping that it would have a bigger improvement by
+replacing all repeat instructions by a single one.</p>
+
+<p>Let’s take a look at its generated code. Here is the code generated by the
+program <code class="language-plaintext highlighter-rouge">+++++</code>:</p>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>objdump <span class="nt">-b</span> binary <span class="nt">-D</span> <span class="nt">-M</span> intel,x86-64 <span class="nt">-m</span> i386:x86-64 dump.bin
+
+dump.bin:     file format binary
+
+
+Disassembly of section .data:
+
+0000000000000000 &lt;.data&gt;:
+   0:   55                      push   rbp
+   1:   48 89 e5                mov    rbp,rsp
+   4:   48 0f b6 17             movzx  rdx,BYTE PTR <span class="o">[</span>rdi]
+   8:   83 c2 01                add    edx,0x1
+   b:   88 17                   mov    BYTE PTR <span class="o">[</span>rdi],dl
+   d:   83 c2 01                add    edx,0x1
+  10:   88 17                   mov    BYTE PTR <span class="o">[</span>rdi],dl
+  12:   83 c2 01                add    edx,0x1
+  15:   88 17                   mov    BYTE PTR <span class="o">[</span>rdi],dl
+  17:   83 c2 01                add    edx,0x1
+  1a:   88 17                   mov    BYTE PTR <span class="o">[</span>rdi],dl
+  1c:   83 c2 01                add    edx,0x1
+  1f:   88 17                   mov    BYTE PTR <span class="o">[</span>rdi],dl
+  21:   48 31 c0                xor    rax,rax
+  24:   48 89 ec                mov    rsp,rbp
+  27:   5d                      pop    rbp
+  28:   c3                      ret
+</code></pre></div></div>
+
+<p>As we can see, contrary to what I expected, Cranelift was not capable of merging
+all sums together when they are between a load and a store.</p>
+
+<p>But looking more closely, it was able to remove the redundant loads
+(<code class="language-plaintext highlighter-rouge">movzx rdx,BYTE PTR [rdi]</code>), but not the stores (<code class="language-plaintext highlighter-rouge">mov BYTE PTR [rdi],dl</code>).</p>
+
+<p>Looking around on Cranelift’s GitHub repo, you will find <a href="https://github.com/bytecodealliance/wasmtime/issues/4167">this issue</a> that
+explains what happened here: the remotion of redundant loads is implemented, but
+for store it is not.</p>
+
+<p>So, I made <a href="https://github.com/Rodrigodd/wasmtime/compare/b077854b57b3aa25295e37ad55a21300e7768c7c..2b960dec5b67f0348ab178121a6c5fd7feae3cdc">a naive implementation of redundant load remotion here</a>
+(this probably miscompile some code). Only removing the stores was not enough,
+because the optimization pass that merge multiple <code class="language-plaintext highlighter-rouge">add</code>s together happened in a
+previous pass, so my change also naively rerun all optimizations passes that
+looked important.</p>
+
+<p>I got the following emitted code:</p>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>objdump <span class="nt">-b</span> binary <span class="nt">-D</span> <span class="nt">-M</span> intel,x86-64 <span class="nt">-m</span> i386:x86-64 dump.bin
+
+dump.bin:     file format binary
+
+
+Disassembly of section .data:
+
+0000000000000000 &lt;.data&gt;:
+   0:   55                      push   rbp
+   1:   48 89 e5                mov    rbp,rsp
+   4:   48 0f b6 0f             movzx  rcx,BYTE PTR <span class="o">[</span>rdi]
+   8:   83 c1 05                add    ecx,0x5
+   b:   88 0f                   mov    BYTE PTR <span class="o">[</span>rdi],cl
+   d:   48 31 c0                xor    rax,rax
+  10:   48 89 ec                mov    rsp,rbp
+  13:   5d                      pop    rbp
+  14:   c3                      ret
+</code></pre></div></div>
+
+<p>Much better! But running again shows that does not give much improvement (I
+forget to benchmark this change, sorry for the lack of precise timings).</p>
+
+<p>Actually, this was to be expected, because an actual improvement only comes from
+optimizing the <code class="language-plaintext highlighter-rouge">&lt;</code> and <code class="language-plaintext highlighter-rouge">&gt;</code> instructions, was we have seen in <a href="/2022/10/21/bf_compiler-part1.html">the first part</a>.
+And that one if much more trick to optimize automatically:</p>
+
+<div class="language-shell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># this ones is for the program `&gt;&gt;&gt;+`</span>
+<span class="nv">$ </span>objdump <span class="nt">-b</span> binary <span class="nt">-D</span> <span class="nt">-M</span> intel,x86-64 <span class="nt">-m</span> i386:x86-64 dump.bin
+
+dump.bin:     file format binary
+
+
+Disassembly of section .data:
+
+0000000000000000 &lt;.data&gt;:
+   0:   55                      push   rbp
+   1:   48 89 e5                mov    rbp,rsp
+   4:   b8 01 00 00 00          mov    eax,0x1
+   9:   48 83 c0 00             add    rax,0x0
+   d:   48 31 c9                xor    rcx,rcx
+  10:   48 81 f9 30 75 00 00    cmp    rcx,0x7530
+  17:   48 0f 43 05 49 00 00    cmovae rax,QWORD PTR <span class="o">[</span>rip+0x49]        <span class="c"># 0x68</span>
+  1e:   00
+  1f:   48 89 c1                mov    rcx,rax
+  22:   48 83 c1 01             add    rcx,0x1
+  26:   48 81 f8 30 75 00 00    cmp    rax,0x7530
+  2d:   48 0f 43 0d 33 00 00    cmovae rcx,QWORD PTR <span class="o">[</span>rip+0x33]        <span class="c"># 0x68</span>
+  34:   00
+  35:   48 89 ca                mov    rdx,rcx
+  38:   48 83 c2 01             add    rdx,0x1
+  3c:   48 81 f9 30 75 00 00    cmp    rcx,0x7530
+  43:   48 0f 43 15 1d 00 00    cmovae rdx,QWORD PTR <span class="o">[</span>rip+0x1d]        <span class="c"># 0x68</span>
+  4a:   00
+  4b:   4c 0f b6 44 17 00       movzx  r8,BYTE PTR <span class="o">[</span>rdi+rdx<span class="k">*</span>1+0x0]
+  51:   41 83 c0 01             add    r8d,0x1
+  55:   44 88 44 17 00          mov    BYTE PTR <span class="o">[</span>rdi+rdx<span class="k">*</span>1+0x0],r8b
+  5a:   48 31 c0                xor    rax,rax
+  5d:   48 89 ec                mov    rsp,rbp
+  60:   5d                      pop    rbp
+  61:   c3                      ret
+</code></pre></div></div>
+
+<p>Here it is less obvious how a program could detect that these three <code class="language-plaintext highlighter-rouge">cmovae</code> can
+be replaced by a single one.</p>
+
+<p>But to be fair, Cranelift is design to have faster compilation times, and may
+not be prepared to optimized such a bad emitted IR.</p>
+
+<p>So let’s optimize these repeated operations during translation. I will not
+implement the three remaining optimizations yet, because I think they will not
+be necessary.</p>
+
+<p>First let’s make the source iterator be peekable, and filter out non-instruction 
+symbols:</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">let</span> <span class="k">mut</span> <span class="n">ops</span> <span class="o">=</span> <span class="n">source</span>
+    <span class="nf">.iter</span><span class="p">()</span>
+    <span class="nf">.enumerate</span><span class="p">()</span>
+    <span class="nf">.filter</span><span class="p">(|</span><span class="n">x</span><span class="p">|</span> <span class="n">b</span><span class="s">"+-&gt;&lt;.,[]"</span><span class="nf">.contains</span><span class="p">(</span><span class="n">x</span><span class="na">.1</span><span class="p">))</span>
+    <span class="nf">.peekable</span><span class="p">();</span>
+
+<span class="k">while</span> <span class="k">let</span> <span class="nf">Some</span><span class="p">((</span><span class="n">i</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">b</span><span class="p">))</span> <span class="o">=</span> <span class="n">ops</span><span class="nf">.next</span><span class="p">()</span> <span class="p">{</span>
+    <span class="c">// ...</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>And on <code class="language-plaintext highlighter-rouge">+</code>, <code class="language-plaintext highlighter-rouge">-</code>, <code class="language-plaintext highlighter-rouge">&lt;</code> and <code class="language-plaintext highlighter-rouge">&gt;</code>, we first count how many of these instructions we
+have, and then emit the optimized IR:</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">b</span><span class="sc">'+'</span> <span class="p">|</span> <span class="n">b</span><span class="sc">'-'</span> <span class="k">=&gt;</span> <span class="p">{</span>
+    <span class="k">let</span> <span class="k">mut</span> <span class="n">n</span> <span class="o">=</span> <span class="k">if</span> <span class="n">b</span> <span class="o">==</span> <span class="n">b</span><span class="sc">'+'</span> <span class="p">{</span> <span class="mi">1</span> <span class="p">}</span> <span class="k">else</span> <span class="p">{</span> <span class="o">-</span><span class="mi">1</span> <span class="p">};</span>
+    <span class="k">while</span> <span class="n">ops</span><span class="nf">.peek</span><span class="p">()</span><span class="nf">.map_or</span><span class="p">(</span><span class="k">false</span><span class="p">,</span> <span class="p">|</span><span class="n">y</span><span class="p">|</span> <span class="n">b</span><span class="s">"+-"</span><span class="nf">.contains</span><span class="p">(</span><span class="n">y</span><span class="na">.1</span><span class="p">))</span> <span class="p">{</span>
+        <span class="k">let</span> <span class="n">b</span> <span class="o">=</span> <span class="o">*</span><span class="n">ops</span><span class="nf">.next</span><span class="p">()</span><span class="nf">.unwrap</span><span class="p">()</span><span class="na">.1</span><span class="p">;</span>
+        <span class="n">n</span> <span class="o">+=</span> <span class="k">if</span> <span class="n">b</span> <span class="o">==</span> <span class="n">b</span><span class="sc">'+'</span> <span class="p">{</span> <span class="mi">1</span> <span class="p">}</span> <span class="k">else</span> <span class="p">{</span> <span class="o">-</span><span class="mi">1</span> <span class="p">};</span>
+    <span class="p">}</span>
+
+    <span class="k">let</span> <span class="n">pointer_value</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.use_var</span><span class="p">(</span><span class="n">pointer</span><span class="p">);</span>
+    <span class="k">let</span> <span class="n">cell_address</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.iadd</span><span class="p">(</span><span class="n">memory_address</span><span class="p">,</span> <span class="n">pointer_value</span><span class="p">);</span>
+    <span class="k">let</span> <span class="n">cell_value</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.load</span><span class="p">(</span><span class="n">I8</span><span class="p">,</span> <span class="n">mem_flags</span><span class="p">,</span> <span class="n">cell_address</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+    <span class="k">let</span> <span class="n">cell_value</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.iadd_imm</span><span class="p">(</span><span class="n">cell_value</span><span class="p">,</span> <span class="n">n</span><span class="p">);</span>
+    <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.store</span><span class="p">(</span><span class="n">mem_flags</span><span class="p">,</span> <span class="n">cell_value</span><span class="p">,</span> <span class="n">cell_address</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+<span class="p">}</span>
+<span class="n">b</span><span class="sc">'&lt;'</span> <span class="p">|</span> <span class="n">b</span><span class="sc">'&gt;'</span> <span class="k">=&gt;</span> <span class="p">{</span>
+    <span class="k">let</span> <span class="k">mut</span> <span class="n">n</span> <span class="o">=</span> <span class="k">if</span> <span class="n">b</span> <span class="o">==</span> <span class="n">b</span><span class="sc">'&gt;'</span> <span class="p">{</span> <span class="mi">1</span> <span class="p">}</span> <span class="k">else</span> <span class="p">{</span> <span class="o">-</span><span class="mi">1</span> <span class="p">};</span>
+    <span class="k">while</span> <span class="n">ops</span><span class="nf">.peek</span><span class="p">()</span><span class="nf">.map_or</span><span class="p">(</span><span class="k">false</span><span class="p">,</span> <span class="p">|</span><span class="n">y</span><span class="p">|</span> <span class="n">b</span><span class="s">"&lt;&gt;"</span><span class="nf">.contains</span><span class="p">(</span><span class="n">y</span><span class="na">.1</span><span class="p">))</span> <span class="p">{</span>
+        <span class="k">let</span> <span class="n">b</span> <span class="o">=</span> <span class="o">*</span><span class="n">ops</span><span class="nf">.next</span><span class="p">()</span><span class="nf">.unwrap</span><span class="p">()</span><span class="na">.1</span><span class="p">;</span>
+        <span class="n">n</span> <span class="o">+=</span> <span class="k">if</span> <span class="n">b</span> <span class="o">==</span> <span class="n">b</span><span class="sc">'&gt;'</span> <span class="p">{</span> <span class="mi">1</span> <span class="p">}</span> <span class="k">else</span> <span class="p">{</span> <span class="o">-</span><span class="mi">1</span> <span class="p">};</span>
+    <span class="p">}</span>
+
+    <span class="k">let</span> <span class="n">pointer_value</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.use_var</span><span class="p">(</span><span class="n">pointer</span><span class="p">);</span>
+    <span class="k">let</span> <span class="n">pointer_plus</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.iadd_imm</span><span class="p">(</span><span class="n">pointer_value</span><span class="p">,</span> <span class="n">n</span><span class="p">);</span>
+
+    <span class="k">let</span> <span class="n">pointer_value</span> <span class="o">=</span> <span class="k">if</span> <span class="n">n</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="p">{</span>
+        <span class="k">let</span> <span class="n">wrapped</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.iadd_imm</span><span class="p">(</span><span class="n">pointer_value</span><span class="p">,</span> <span class="n">n</span> <span class="o">-</span> <span class="mi">30_000</span><span class="p">);</span>
+        <span class="k">let</span> <span class="n">cmp</span> <span class="o">=</span>
+            <span class="n">builder</span>
+                <span class="nf">.ins</span><span class="p">()</span>
+                <span class="nf">.icmp_imm</span><span class="p">(</span><span class="nn">IntCC</span><span class="p">::</span><span class="n">SignedLessThan</span><span class="p">,</span> <span class="n">pointer_plus</span><span class="p">,</span> <span class="mi">30_000</span><span class="p">);</span>
+        <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.select</span><span class="p">(</span><span class="n">cmp</span><span class="p">,</span> <span class="n">pointer_plus</span><span class="p">,</span> <span class="n">wrapped</span><span class="p">)</span>
+    <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+        <span class="k">let</span> <span class="n">wrapped</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.iadd_imm</span><span class="p">(</span><span class="n">pointer_value</span><span class="p">,</span> <span class="n">n</span> <span class="o">+</span> <span class="mi">30_000</span><span class="p">);</span>
+        <span class="k">let</span> <span class="n">cmp</span> <span class="o">=</span> <span class="n">builder</span>
+            <span class="nf">.ins</span><span class="p">()</span>
+            <span class="nf">.icmp_imm</span><span class="p">(</span><span class="nn">IntCC</span><span class="p">::</span><span class="n">SignedLessThan</span><span class="p">,</span> <span class="n">pointer_plus</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+        <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.select</span><span class="p">(</span><span class="n">cmp</span><span class="p">,</span> <span class="n">wrapped</span><span class="p">,</span> <span class="n">pointer_plus</span><span class="p">)</span>
+    <span class="p">};</span>
+
+    <span class="n">builder</span><span class="nf">.def_var</span><span class="p">(</span><span class="n">pointer</span><span class="p">,</span> <span class="n">pointer_value</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Running it again:</p>
+
+<p><img src="/assets/brainfuck/plot13.svg" alt="" style="display:block; margin-left:auto; margin-right:auto" /></p>
+
+<p>Much faster! But it is still slower than our optimized compiler.</p>
+
+<p>So I gave up on the idea that, currently, Cranelift could apply enough
+optimizations to replace our optimizations.</p>
+
+<p>So, <a href="https://github.com/Rodrigodd/bf-compiler/commit/eaf72a511e29d1ff611b7b8af0f702199020e7a7">here is the implementation for the optimized instructions</a>. The
+<code class="language-plaintext highlighter-rouge">MoveUntil</code> instructions was not included, because I noticed that it does not
+help in generating better optimized code:</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nn">Instruction</span><span class="p">::</span><span class="n">Clear</span> <span class="k">=&gt;</span> <span class="p">{</span>
+    <span class="k">let</span> <span class="n">pointer_value</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.use_var</span><span class="p">(</span><span class="n">pointer</span><span class="p">);</span>
+    <span class="k">let</span> <span class="n">cell_address</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.iadd</span><span class="p">(</span><span class="n">memory_address</span><span class="p">,</span> <span class="n">pointer_value</span><span class="p">);</span>
+    <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.store</span><span class="p">(</span><span class="n">mem_flags</span><span class="p">,</span> <span class="n">zero_byte</span><span class="p">,</span> <span class="n">cell_address</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+<span class="p">}</span>
+<span class="nn">Instruction</span><span class="p">::</span><span class="nf">AddTo</span><span class="p">(</span><span class="n">n</span><span class="p">)</span> <span class="k">=&gt;</span> <span class="p">{</span>
+    <span class="k">let</span> <span class="n">n</span> <span class="o">=</span> <span class="n">n</span> <span class="k">as</span> <span class="nb">i64</span><span class="p">;</span>
+    <span class="k">let</span> <span class="n">pointer_value</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.use_var</span><span class="p">(</span><span class="n">pointer</span><span class="p">);</span>
+    <span class="k">let</span> <span class="n">to_add</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.iadd_imm</span><span class="p">(</span><span class="n">pointer_value</span><span class="p">,</span> <span class="n">n</span><span class="p">);</span>
+
+    <span class="k">let</span> <span class="n">to_add</span> <span class="o">=</span> <span class="k">if</span> <span class="n">n</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="p">{</span>
+        <span class="k">let</span> <span class="n">wrapped</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.iadd_imm</span><span class="p">(</span><span class="n">pointer_value</span><span class="p">,</span> <span class="n">n</span> <span class="o">-</span> <span class="mi">30_000</span><span class="p">);</span>
+        <span class="k">let</span> <span class="n">cmp</span> <span class="o">=</span> <span class="n">builder</span>
+            <span class="nf">.ins</span><span class="p">()</span>
+            <span class="nf">.icmp_imm</span><span class="p">(</span><span class="nn">IntCC</span><span class="p">::</span><span class="n">SignedLessThan</span><span class="p">,</span> <span class="n">to_add</span><span class="p">,</span> <span class="mi">30_000</span><span class="p">);</span>
+        <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.select</span><span class="p">(</span><span class="n">cmp</span><span class="p">,</span> <span class="n">to_add</span><span class="p">,</span> <span class="n">wrapped</span><span class="p">)</span>
+    <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+        <span class="k">let</span> <span class="n">wrapped</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.iadd_imm</span><span class="p">(</span><span class="n">pointer_value</span><span class="p">,</span> <span class="n">n</span> <span class="o">+</span> <span class="mi">30_000</span><span class="p">);</span>
+        <span class="k">let</span> <span class="n">cmp</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.icmp_imm</span><span class="p">(</span><span class="nn">IntCC</span><span class="p">::</span><span class="n">SignedLessThan</span><span class="p">,</span> <span class="n">to_add</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+        <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.select</span><span class="p">(</span><span class="n">cmp</span><span class="p">,</span> <span class="n">wrapped</span><span class="p">,</span> <span class="n">to_add</span><span class="p">)</span>
+    <span class="p">};</span>
+
+    <span class="k">let</span> <span class="n">from_address</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.iadd</span><span class="p">(</span><span class="n">memory_address</span><span class="p">,</span> <span class="n">pointer_value</span><span class="p">);</span>
+    <span class="k">let</span> <span class="n">to_address</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.iadd</span><span class="p">(</span><span class="n">memory_address</span><span class="p">,</span> <span class="n">to_add</span><span class="p">);</span>
+
+    <span class="k">let</span> <span class="n">from_value</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.load</span><span class="p">(</span><span class="n">I8</span><span class="p">,</span> <span class="n">mem_flags</span><span class="p">,</span> <span class="n">from_address</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+    <span class="k">let</span> <span class="n">to_value</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.load</span><span class="p">(</span><span class="n">I8</span><span class="p">,</span> <span class="n">mem_flags</span><span class="p">,</span> <span class="n">to_address</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+
+    <span class="k">let</span> <span class="n">sum</span> <span class="o">=</span> <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.iadd</span><span class="p">(</span><span class="n">to_value</span><span class="p">,</span> <span class="n">from_value</span><span class="p">);</span>
+
+    <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.store</span><span class="p">(</span><span class="n">mem_flags</span><span class="p">,</span> <span class="n">zero_byte</span><span class="p">,</span> <span class="n">from_address</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+    <span class="n">builder</span><span class="nf">.ins</span><span class="p">()</span><span class="nf">.store</span><span class="p">(</span><span class="n">mem_flags</span><span class="p">,</span> <span class="n">sum</span><span class="p">,</span> <span class="n">to_address</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>And the results:</p>
+
+<p><img src="/assets/brainfuck/plot14.svg" alt="" style="display:block; margin-left:auto; margin-right:auto" /></p>
+
+<p>Now it is faster that our previous implementation! At least, we got something
+from using Cranelift.</p>
+
+<p>It is also important to notice that the times that I measure here takes in
+account the running time of the entire program, including the compilation time.
+Mandelbrot takes at least 100ms to compile, and factor 30 ms, which are already
+significant times.</p>
+
+<p>But of course, optimizations is only one the strengths of using a machine code
+generator. Because now our compiler can target 3 different architectures! We
+have x86-64, AArch64, s390x and however backend they add in the future!</p>
+
+<p><a href="https://github.com/Rodrigodd/bf-compiler/commit/ece3bac8d4f0862eac81f8c4b5821ea01ee4fd99">After changing ABI’s of the functions to the host default</a> (we
+don’t need to stick to a single calling convention anymore), I was finally able
+to run our compiler on my smartphone (an AArch64), using
+<a href="https://termux.dev/">Termux</a>:</p>
+
+<p><img src="/assets/brainfuck/Screenshot_20221118-193503_Termux.png" alt="" style="display:block; margin-left:auto; margin-right:auto" /></p>
+
+<p>Cool!</p>
+<h1 id="conclusion">
+  
+  
+    Conclusion&nbsp<a href="#conclusion" class="anchor">§</a>
+  
+  
+</h1>
+    
+
+<p>At the start of this post I have no idea of how good Cranelift optimizations
+were. Ideally it would be able to automatically figure out all the optimizations
+that we came up in the first part. At the other end, it would emit suboptimal
+machine code, and be slower than our handcrafted implementation.</p>
+
+<p>In the end, we verified that the second scenario didn’t occur, the generated
+code was actually faster than our implementation.</p>
+
+<p>However, it was far from the first one: even the basic optimization of combining
+multiple <code class="language-plaintext highlighter-rouge">+</code> didn’t happen by default (at least I was able to implement it in
+Cranelift fairly easy, despite being hackish).</p>
+
+<p>Yet, it accomplished our main goal of using a machine code generator: be able to
+target multiple architectures with only a fraction of the knowledge and work
+required.</p>
+
+<p>Note that this post is not showing that Cranelift optimizations are bad, but how
+bad brainfuck is. Brainfuck only has a single persistent variable and almost
+every instruction need to read and write to memory.</p>
+
+<p>This means that many of Cranelift optimizations passes are completely
+underexplored, because they are designed for languages that have multiples
+values being passed around (more than there are CPU registers), as is the norm
+for most programming languages.</p>
+<h1 id="future-work">
+  
+  
+    Future work&nbsp<a href="#future-work" class="anchor">§</a>
+  
+  
+</h1>
+    
+
+<p><img src="/assets/brainfuck/plot15.svg" alt="" style="display:block; margin-left:auto; margin-right:auto" /></p>
+
+<p>Since the beginning of this series we are optimizing our brainfuck
+implementation more and more. In fact, we could continue creating more and more
+optimizations to our program, making the execution of out brainfuck programs be
+faster and faster.</p>
+
+<p>But as we go applying these optimizations, the time necessary to parse and
+compile the code starts to become greater and greater. To such a point, that
+applying more optimizations will not actually decrease the time we need to
+wait to get a brainfuck program to run.</p>
+
+<p>At that point, having such a degree of optimizations is not viable when creating
+a JIT compiler.</p>
+
+<p>To solve this, we can instead make an AOT compiler<sup id="fnref:aot" role="doc-noteref"><a href="#fn:aot" class="footnote" rel="footnote">2</a></sup>. Instead of waiting for
+the compilation every time we need to run a program, we can instead compile it
+just one, ahead-of-time (AOT), and serialize it to disk. Now, the user can load
+and run the program as many times as they want, without needing to wait for the
+compilation.</p>
+
+<p>And this is exactly what we will do in <a href="/2022/12/31/bf_compiler-part4.html">the next part</a>. We will see how
+we can get our generated machine code and serialize it to an executable file,
+like a ELF file.</p>
+
+<p>All the code developed during these series <a href="https://github.com/Rodrigodd/bf-compiler">can be found here</a> (may
+not be exactly equal to one showed here).</p>
+
+<div class="footnotes" role="doc-endnotes">
+  <ol>
+    <li id="fn:seal" role="doc-endnote">
+      <p>Sealing them as soon as possible allows the resolving of <code class="language-plaintext highlighter-rouge">Variable</code>s to
+be faster. I present and use <code class="language-plaintext highlighter-rouge">Variable</code>s when we start making our brainfuck
+compiler. <a href="#fnref:seal" class="reversefootnote" role="doc-backlink">&#8617;</a></p>
+    </li>
+    <li id="fn:aot" role="doc-endnote">
+      <p>I used the term “AOT” here to have a contrast with “JIT”, but it is a
+term more used in context where the language is expected to be JIT compiled.
+Normally, the term “compiled language” already implies that the language is
+compiled ahead of time. AOT is also used in scenarios where the compilation is
+not emitting machine code directly, so “static compiled” or “native compiled”
+may be better suitable to “compiled languages” than “AOT compiled”. <a href="#fnref:aot" class="reversefootnote" role="doc-backlink">&#8617;</a></p>
+    </li>
+  </ol>
+</div>
+
+  </div><a class="u-url" href="/2022/11/26/bf_compiler-part3.html" hidden></a>
+</article>
+
+      </div>
+    </main><footer class="site-footer h-card">
+  <data class="u-url" href="/"></data>
+
+  <div class="wrapper">
+
+    <div class="footer-col-wrapper">
+      <div class="footer-col">
+        <p class="feed-subscribe">
+          <a href="/feed.xml">
+            <svg class="svg-icon orange">
+              <use xlink:href="/assets/minima-social-icons.svg#rss"></use>
+            </svg><span>Subscribe</span>
+          </a>
+        </p>
+      </div>
+      <div class="footer-col">
+        <p></p>
+      </div>
+    </div>
+
+    <div class="social-links"><ul class="social-media-list"><li>
+  <a rel="me" href="https://github.com/Rodrigodd/Rodrigodd.github.io" target="_blank" title="github">
+    <svg class="svg-icon grey">
+      <use xlink:href="/assets/minima-social-icons.svg#github"></use>
+    </svg>
+  </a>
+</li>
+</ul>
+</div>
+
+  </div>
+
+</footer>
+</body>
+
+</html>
