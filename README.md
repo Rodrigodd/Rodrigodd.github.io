@@ -34,8 +34,7 @@ Other commands:
 - `sass/`: the stylesheet, including the vendored [minima](https://github.com/jekyll/minima) theme.
 - `static/`: files copied as they are (images, favicon, ...).
 - `src/`: the generator:
-  - `markdown.rs`: Markdown to HTML, compatible with kramdown (attribute lists,
-    smart quotes, header ids, footnotes);
+  - `markdown.rs`: Markdown to HTML, using [comrak](https://docs.rs/comrak);
   - `highlight.rs`: syntax highlighting with [arborium](https://github.com/bearcove/arborium)
     (to support another language, enable its `lang-*` feature in `Cargo.toml`);
   - `feed.rs`: the Atom feed;

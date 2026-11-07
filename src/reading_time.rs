@@ -2,7 +2,9 @@
 //! layout: code words count as half a word, and the rest is read at 250 words
 //! per minute.
 
-use crate::markdown::strip_html;
+use std::sync::LazyLock;
+
+use regex::Regex;
 
 pub fn minutes(content_html: &str) -> u64 {
     let words_total = count_words(&strip_html(content_html));
@@ -18,4 +20,10 @@ pub fn minutes(content_html: &str) -> u64 {
 
 fn count_words(text: &str) -> usize {
     text.split_whitespace().count()
+}
+
+/// Strip HTML tags and comments, like Liquid's `strip_html`.
+fn strip_html(html: &str) -> String {
+    static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?s)<!--.*?-->|<.*?>").unwrap());
+    RE.replace_all(html, "").into_owned()
 }

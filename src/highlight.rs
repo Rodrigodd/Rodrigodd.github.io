@@ -36,16 +36,6 @@ pub fn highlight(lang: &str, code: &str) -> String {
     }
 }
 
-/// Render a fenced code block.
-pub fn code_block(lang: &str, code: &str) -> String {
-    let class = if lang.is_empty() {
-        String::new()
-    } else {
-        format!(" class=\"language-{}\"", escape_html(lang))
-    };
-    format!("<pre><code{class}>{}</code></pre>\n", highlight(lang, code))
-}
-
 /// The CSS for the highlighted code, with a light and a dark theme following
 /// the system preference.
 pub fn css() -> Result<String> {

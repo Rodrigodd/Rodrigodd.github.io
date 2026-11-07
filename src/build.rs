@@ -15,10 +15,7 @@ use crate::{feed, markdown, reading_time};
 
 pub struct RenderedPost {
     pub post: Post,
-    /// HTML of the content, as used in the feed.
     pub html: String,
-    /// HTML of the content, with anchor links in headings, as used in the page.
-    pub html_with_anchors: String,
     pub excerpt: String,
 }
 
@@ -202,7 +199,6 @@ pub fn build(root: &Path, out: &Path, dev_script: Option<&str>) -> Result<()> {
             Ok(RenderedPost {
                 post,
                 html: r.html,
-                html_with_anchors: r.html_with_anchors,
                 excerpt: r.excerpt,
             })
         })
@@ -259,7 +255,7 @@ pub fn build(root: &Path, out: &Path, dev_script: Option<&str>) -> Result<()> {
             date => post.date.to_rfc3339(),
             modified_date => post.modified_date.map(|d| d.to_rfc3339()),
             reading_time => reading_time::minutes(&p.html),
-            content => p.html_with_anchors.clone(),
+            content => p.html.clone(),
         };
         let seo = seo(
             &config,
