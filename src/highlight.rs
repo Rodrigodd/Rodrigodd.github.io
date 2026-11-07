@@ -1,7 +1,10 @@
 //! Syntax highlighting of code blocks, using arborium (tree-sitter grammars).
 //!
 //! Languages are enabled by the `lang-*` features of arborium in Cargo.toml.
-//! Code in other languages is rendered as plain text.
+//! Languages that arborium doesn't support may have a highlighter in
+//! `fallback.rs`; code in other languages is rendered as plain text.
+
+mod fallback;
 
 use std::sync::{LazyLock, Mutex};
 
@@ -29,6 +32,9 @@ pub fn escape_html(s: &str) -> String {
 pub fn highlight(lang: &str, code: &str) -> String {
     if lang.is_empty() {
         return escape_html(code);
+    }
+    if let Some(html) = fallback::highlight(lang, code) {
+        return html;
     }
     match HIGHLIGHTER.lock().unwrap().highlight(lang, code) {
         Ok(html) => html,

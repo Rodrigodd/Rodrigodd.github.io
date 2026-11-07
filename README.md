@@ -36,7 +36,9 @@ Other commands:
 - `src/`: the generator:
   - `markdown.rs`: Markdown to HTML, using [comrak](https://docs.rs/comrak);
   - `highlight.rs`: syntax highlighting with [arborium](https://github.com/bearcove/arborium)
-    (to support another language, enable its `lang-*` feature in `Cargo.toml`);
+    (to support another language, enable its `lang-*` feature in `Cargo.toml`),
+    and `highlight/fallback.rs`: hand-written highlighters for languages that
+    arborium doesn't support (Brainfuck and Cranelift IR);
   - `feed.rs`: the Atom feed;
   - `build.rs`, `serve.rs`, `check.rs`: the commands.
 
