@@ -788,7 +788,7 @@ and fixing them, [it's finished]! I finally get to measure its performance:
 
 [it's finished]: https://github.com/Rodrigodd/bf-compiler/blob/bc3e2aa8588dfd0cb543632e6cb729bf62977f13/singlepass-jit/src/main.rs
 
-![](/assets/brainfuck/plot8.svg){:style="display:block; margin-left:auto; margin-right:auto"}
+![](/assets/brainfuck/plot8.svg)
 
 It is almost 7 times faster than the interpreted one! It is within the
 expected performance increase from the analysis of the interpreter overhead. 
@@ -1253,7 +1253,7 @@ compatible with Windows.
 
 If we look at its performance:
 
-![](/assets/brainfuck/plot9.svg){:style="display:block; margin-left:auto; margin-right:auto"}
+![](/assets/brainfuck/plot9.svg)
 
 It continues to be within the margin of error of the previous one.
 
@@ -1408,7 +1408,7 @@ And our [optimized JIT compiler is complete]! Measuring its performance:
 
 [optimized JIT compiler is complete]: https://github.com/Rodrigodd/bf-compiler/blob/872c0c852cba21445a2982be02411a8c22cdc078/optimized-jit/src/main.rs
 
-![](/assets/brainfuck/plot10.svg){:style="display:block; margin-left:auto; margin-right:auto"}
+![](/assets/brainfuck/plot10.svg)
 
 And was expected, the performance increase is big! More than 3x faster.
 
@@ -1440,7 +1440,7 @@ typed languages.
 
 # Future work
 
-![](/assets/brainfuck/plot11.svg){:style="display:block; margin-left:auto; margin-right:auto"}
+![](/assets/brainfuck/plot11.svg)
 
 We manage to create more than 26x performance increase since our first
 Interpreter. But we can always do better. One possibility is to investigate what

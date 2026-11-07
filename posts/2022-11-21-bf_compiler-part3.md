@@ -726,7 +726,7 @@ b',' => {
 
 And done! If we run it:
 
-![](/assets/brainfuck/plot12.svg){:style="display:block; margin-left:auto; margin-right:auto"}
+![](/assets/brainfuck/plot12.svg)
 
 14s, about 4% faster than our single-pass implementation. It is definitely
 faster, but, well, I was hoping that it would have a bigger improvement by
@@ -924,7 +924,7 @@ b'<' | b'>' => {
 
 Running it again:
 
-![](/assets/brainfuck/plot13.svg){:style="display:block; margin-left:auto; margin-right:auto"}
+![](/assets/brainfuck/plot13.svg)
 
 Much faster! But it is still slower than our optimized compiler.
 
@@ -975,7 +975,7 @@ Instruction::AddTo(n) => {
 
 And the results:
 
-![](/assets/brainfuck/plot14.svg){:style="display:block; margin-left:auto; margin-right:auto"}
+![](/assets/brainfuck/plot14.svg)
 
 Now it is faster that our previous implementation! At least, we got something
 from using Cranelift.
@@ -996,7 +996,7 @@ to run our compiler on my smartphone (an AArch64), using
 
 [change_ABI]: https://github.com/Rodrigodd/bf-compiler/commit/ece3bac8d4f0862eac81f8c4b5821ea01ee4fd99
 
-![](/assets/brainfuck/Screenshot_20221118-193503_Termux.png){:style="display:block; margin-left:auto; margin-right:auto"}
+![](/assets/brainfuck/Screenshot_20221118-193503_Termux.png)
 
 Cool!
 
@@ -1029,7 +1029,7 @@ for most programming languages.
 
 # Future work
 
-![](/assets/brainfuck/plot15.svg){:style="display:block; margin-left:auto; margin-right:auto"}
+![](/assets/brainfuck/plot15.svg)
 
 Since the beginning of this series we are optimizing our brainfuck
 implementation more and more. In fact, we could continue creating more and more

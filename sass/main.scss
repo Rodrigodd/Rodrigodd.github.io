@@ -11,6 +11,13 @@
     }
 }
 
+// center images in posts
+.post-content img {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
 // show anchor on hover
 h1:hover .anchor,
 h2:hover .anchor,

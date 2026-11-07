@@ -555,7 +555,7 @@ the byte index would be better), but this is good enough for our needs.
 
 Running the programs again:
 
-![](/assets/brainfuck/plot0.svg "A mean decrease of 26.63% from the previous result"){:style="display:block; margin-left:auto; margin-right:auto"}
+![](/assets/brainfuck/plot0.svg "A mean decrease of 26.63% from the previous result")
 
 A decrease of 25%! But we can do better.
 
@@ -617,7 +617,7 @@ for b in source {
 ```
 Running it:
 
-![](/assets/brainfuck/plot1.svg "A mean decrease of 0.26% from the previous result"){:style="display:block; margin-left:auto; margin-right:auto"}
+![](/assets/brainfuck/plot1.svg "A mean decrease of 0.26% from the previous result")
 
 Well... it was not as big of a reduction as I was expecting, only 0.26%. 0.26 ± 0.37
 percent to be more precise. It is even uncertain that it really decreased.
@@ -670,7 +670,7 @@ for b in source {
 
 Running again:
 
-![](/assets/brainfuck/plot2.svg "A mean decrease of 71.3% from the previous result"){:style="display:block; margin-left:auto; margin-right:auto"}
+![](/assets/brainfuck/plot2.svg "A mean decrease of 71.3% from the previous result")
 
 Wow! This is what I was looking for, more than 3 times in performance increase!
 
@@ -707,8 +707,7 @@ count the number of instructions being executed:
 | \]    | 835,818,921    | 242,695,606   | 835,818,921   | 242,695,606   |
 | ,     | 6,240          | 21            | 6,240         | 21            |
 | ,     | 0              | 10            | 0             | 10            |
-| ----- | -------------- | ------------- | ------------- | ------------- |
-| Total | 10,521,107,970 | 3,226,569,468 | 3,018,468,909 | 1,242,237,371 |
+| **Total** | **10,521,107,970** | **3,226,569,468** | **3,018,468,909** | **1,242,237,371** |
 
 Now, with this data, everything becomes much clearer. The `Add` optimization
 has decreased the total number of operation by only 0.24%, and the `Move`
@@ -841,7 +840,7 @@ b']' => {
 
 Running it:
 
-![](/assets/brainfuck/plot3.svg "A mean decreased of 4.5% from the previous result"){:style="display:block; margin-left:auto; margin-right:auto"}
+![](/assets/brainfuck/plot3.svg "A mean decreased of 4.5% from the previous result")
 
 A mean decrease of 4.5% in execution time. And it decreased the total number of
 instructions by 0.80% and 4.59%, for `mandelbrot.bf` and `factor.bf`,
@@ -889,7 +888,7 @@ match instructions.as_slice() {
 }
 ```
 
-![](/assets/brainfuck/plot4.svg "A mean decrease of 15.3% from the previous result"){:style="display:block; margin-left:auto; margin-right:auto"}
+![](/assets/brainfuck/plot4.svg "A mean decrease of 15.3% from the previous result")
 
 This one gives more substantial performance increase. A mean decrease in
 run-time by 15.3%. Only 2.56% on mandelbrot, but 28.13% on factor!
@@ -938,7 +937,7 @@ match instructions.as_slice() {
 }
 ```
 
-![](/assets/brainfuck/plot5.svg "A mean decrease of 11.2% from the previous result"){:style="display:block; margin-left:auto; margin-right:auto"}
+![](/assets/brainfuck/plot5.svg "A mean decrease of 11.2% from the previous result")
 
 As expected from the previous profiles, this optimization has greater impact on
 the mandelbrot.bf. Time goes down by 18.61% on mandelbrot and 3.79% on factor!
@@ -973,7 +972,7 @@ here][rust_overview].
 
 # Future work
 
-![](/assets/brainfuck/plot6.svg "A decrease of 8.9% from the previous result"){:style="display:block; margin-left:auto; margin-right:auto"}
+![](/assets/brainfuck/plot6.svg "A decrease of 8.9% from the previous result")
 
 From the first implementation to the last one we get a speedup of almost 7x.
 Of course, we can always do better. We could continue implementing specific
