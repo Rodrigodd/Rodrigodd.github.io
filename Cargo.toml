@@ -8,7 +8,7 @@ anyhow = "1.0.104"
 arborium = { version = "2.18.2", default-features = false, features = ["lang-rust", "lang-x86asm", "lang-bash", "lang-toml"] }
 chrono = "0.4.45"
 comrak = { version = "0.59.0", default-features = false }
-grass = "0.13.4"
+grass = { version = "0.13.4", default-features = false }
 minijinja = { version = "3.1.0", features = ["serde", "json"] }
 notify = "8.2.1"
 regex = "1.13.1"
