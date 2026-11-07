@@ -1,6 +1,7 @@
 //! Development server: serves the built site, rebuilds it when a source file
 //! changes, and reloads open pages after each rebuild.
 
+use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -37,7 +38,16 @@ fn rebuild(root: &Path, out: &Path, version: &AtomicU64) {
     version.fetch_add(1, Ordering::SeqCst);
 }
 
-pub fn serve(root: &Path, out: &Path, port: u16) -> Result<()> {
+/// Serve the site on each of the `addrs`.
+pub fn serve(root: &Path, out: &Path, addrs: &[IpAddr], port: u16) -> Result<()> {
+    // Bind every address first, so that an error is reported before building.
+    let servers = addrs
+        .iter()
+        .map(|&ip| {
+            let addr = SocketAddr::new(ip, port);
+            Server::http(addr).map_err(|e| anyhow::anyhow!("binding {addr}: {e}"))
+        })
+        .collect::<Result<Vec<_>>>()?;
     let version = Arc::new(AtomicU64::new(0));
     rebuild(root, out, &version);
 
@@ -66,8 +76,18 @@ pub fn serve(root: &Path, out: &Path, port: u16) -> Result<()> {
         });
     }
 
-    let server = Server::http(("127.0.0.1", port)).map_err(|e| anyhow::anyhow!("{e}"))?;
-    println!("serving on http://localhost:{port}");
+    for server in &servers {
+        println!("serving on http://{}", server.server_addr());
+    }
+    std::thread::scope(|scope| {
+        for server in &servers {
+            scope.spawn(|| handle_requests(server, out, &version));
+        }
+    });
+    Ok(())
+}
+
+fn handle_requests(server: &Server, out: &Path, version: &AtomicU64) {
     for request in server.incoming_requests() {
         let url = request
             .url()
@@ -85,7 +105,6 @@ pub fn serve(root: &Path, out: &Path, port: u16) -> Result<()> {
         };
         let _ = request.respond(response);
     }
-    Ok(())
 }
 
 fn resolve(out: &Path, url: &str) -> Option<PathBuf> {

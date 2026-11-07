@@ -11,7 +11,9 @@ cargo run -- serve
 ```
 
 This builds the site, serves it on http://localhost:4000, and rebuilds and
-reloads the page whenever a file changes.
+reloads the page whenever a file changes. Use `--bind <ip>` (repeatable) and
+`--port <port>` to listen on other addresses, e.g. `cargo run -- serve --bind
+0.0.0.0` to open the site from another device on the network.
 
 Other commands:
 
