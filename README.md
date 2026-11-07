@@ -18,9 +18,9 @@ Other commands:
 - `cargo run --release -- build`: build the site into `_site/`.
 - `cargo run -- check`: compare `_site/` with `tests/baseline/`, a snapshot of
   the site when it was built with Jekyll. It fails if a page of the old site is
-  missing, if an internal link is broken, or if a feed entry changed its id or
-  dates (feed readers would show it as a new or updated post). Other differences
-  are only reported.
+  missing, if a section id of an old page (the target of `page.html#section`
+  links) is gone, if an internal link is broken, or if a feed entry changed its
+  id or dates (feed readers would show it as a new or updated post).
 
 # Organization
 
