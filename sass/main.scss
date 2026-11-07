@@ -5,15 +5,7 @@
   "minima/initialize";
 
 
-// fix bad contrast in dark syntax hightligh
 @media (prefers-color-scheme: dark) {
-    .highlight {
-        .c1 { color: #898989; }
-        .c { color: #898989; }
-        .cs { color: #898989; }
-
-        .nn { color: #d3a250; }
-    }
     img {
         background-color: #CCC;
     }

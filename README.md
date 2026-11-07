@@ -36,8 +36,8 @@ Other commands:
 - `src/`: the generator:
   - `markdown.rs`: Markdown to HTML, compatible with kramdown (attribute lists,
     smart quotes, header ids, footnotes);
-  - `highlight.rs`: syntax highlighting compatible with Rouge (add new languages
-    here);
+  - `highlight.rs`: syntax highlighting with [arborium](https://github.com/bearcove/arborium)
+    (to support another language, enable its `lang-*` feature in `Cargo.toml`);
   - `feed.rs`: the Atom feed;
   - `build.rs`, `serve.rs`, `check.rs`: the commands.
 

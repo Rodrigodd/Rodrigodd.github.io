@@ -7,7 +7,7 @@ use crate::markdown::strip_html;
 pub fn minutes(content_html: &str) -> u64 {
     let words_total = count_words(&strip_html(content_html));
     let without_code = content_html
-        .replace("<pre class=\"highlight\">", "<!--")
+        .replace("<pre>", "<!--")
         .replace("</pre>", "-->");
     let words_without_code = count_words(&strip_html(&without_code));
 

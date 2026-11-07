@@ -10,7 +10,7 @@ use walkdir::WalkDir;
 
 use crate::config::Config;
 use crate::content::{self, Post};
-use crate::highlight::escape_html;
+use crate::highlight::{self, escape_html};
 use crate::{feed, markdown, reading_time};
 
 pub struct RenderedPost {
@@ -220,6 +220,7 @@ pub fn build(root: &Path, out: &Path, dev_script: Option<&str>) -> Result<()> {
     )
     .map_err(|e| anyhow::anyhow!("compiling sass: {e}"))?;
     write(out, "/assets/css/style.css", &css)?;
+    write(out, "/assets/css/highlight.css", &highlight::css()?)?;
 
     let nav_pages: Vec<NavPage> = pages
         .iter()
