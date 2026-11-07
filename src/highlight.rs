@@ -45,8 +45,8 @@ pub fn highlight(lang: &str, code: &str) -> String {
 /// The CSS for the highlighted code, with a light and a dark theme following
 /// the system preference.
 pub fn css() -> Result<String> {
-    let light = builtin::github_light().to_css("pre");
-    let dark = builtin::github_dark().to_css("pre");
+    let light = builtin::github_light().to_css("pre > code");
+    let dark = builtin::github_dark().to_css("pre > code");
     // The themes use CSS nesting; compile them to plain CSS.
     let scss = format!("{light}\n@media (prefers-color-scheme: dark) {{\n{dark}\n}}\n");
     grass::from_string(scss, &grass::Options::default())

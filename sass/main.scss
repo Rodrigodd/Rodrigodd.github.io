@@ -11,9 +11,46 @@
     }
 }
 
-// the background of code blocks comes from the highlight theme
-pre > code {
+// Code blocks: the `pre` is a scroll container, and its `code` is the visible
+// box, which grows to fit the longest line. So a block wider than the column
+// scrolls as a whole, background included, instead of scrolling its content
+// inside the box. The colors of the box come from the highlight theme.
+pre {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
     background: transparent;
+    overflow-x: auto;
+
+    > code {
+        display: block;
+        box-sizing: border-box;
+        width: max-content;
+        min-width: 100%;
+        padding: 8px 12px;
+        border: 1px solid $border-color-01;
+        border-radius: 3px;
+    }
+}
+
+// On narrow screens, where the column takes the whole screen, code blocks
+// scroll across the whole screen width, while still starting aligned with the
+// text.
+@include media-query($on-laptop) {
+    .page-content {
+        // Code blocks are sized relative to the page width (`cqw` units), which
+        // unlike `vw` doesn't include the scrollbar.
+        container-type: inline-size;
+        // Never let the code blocks make the page scroll horizontally.
+        overflow-x: clip;
+    }
+
+    pre {
+        margin-left: calc(50% - 50cqw);
+        margin-right: calc(50% - 50cqw);
+        padding-left: calc(50cqw - 50%);
+        padding-right: calc(50cqw - 50%);
+    }
 }
 
 // center images in posts
