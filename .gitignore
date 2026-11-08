@@ -1,5 +1,4 @@
-_site
-.sass-cache
-.jekyll-cache
-.jekyll-metadata
-vendor
+/target
+/_site
+ltex.dictionary.en-US.txt
+ltex.hiddenFalsePositives.en-US.txt

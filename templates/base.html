@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="{{ site.lang }}">
+{%- include "partials/head.html" %}
+<body>
+{%- include "partials/header.html" %}
+<main class="page-content" aria-label="Content">
+      <div class="wrapper">
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+{%- include "partials/footer.html" %}
+{%- if dev_script %}{{ dev_script|safe }}{% endif %}
+</body>
+
+</html>

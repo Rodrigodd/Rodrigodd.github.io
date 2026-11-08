@@ -596,8 +596,7 @@ not possible to disable it[^gambatte-options].
 [^gambatte-turbo]: The emulator has a hard cap of 16 in the frameskip
     configuration, but I modified the source code to disable that limit.
 
-Here are the results[^raw-data]:
-{: #emulator-comparison}
+<span id="emulator-comparison"></span>Here are the results[^raw-data]:
 
 [^raw-data]: You can also see the [raw data collected here](https://docs.google.com/spreadsheets/d/1jrf2O9iv1QbqRu0Hown5LX2dKIk7RecZ-SZrNFdJL7I/edit?usp=sharing).
 
@@ -655,7 +654,7 @@ and more. I have already [done some experiments with it before][bf_clift], and
 it seems to work pretty well. It will also help with porting the JIT compiler to
 run on Android.
 
-[bf_clift]: {% post_url 2022-11-21-bf_compiler-part3 %}
+[bf_clift]: 2022-11-21-bf_compiler-part3.md
 
 Another inefficiency in my JIT compiler is regarding redundant
 recompilations. Currently, I am building an entire block for each `(bank,
@@ -686,7 +685,7 @@ Adventures In JIT Compilation series][eli_jit], which I [re-implemented in
 Rust][bf_part1] as a learning exercise.
 
 [eli_jit]: https://eli.thegreenplace.net/2017/adventures-in-jit-compilation-part-1-an-interpreter/
-[bf_part1]: {% post_url 2022-10-16-bf_compiler-part1 %}
+[bf_part1]: 2022-10-16-bf_compiler-part1.md
 
 If you want to take a look at GameRoy, I invite you to check out [its GitHub
 repository][GameRoy].

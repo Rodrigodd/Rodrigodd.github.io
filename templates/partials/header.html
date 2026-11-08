@@ -1,0 +1,14 @@
+<header class="site-header">
+
+  <div class="wrapper"><a class="site-title" rel="author" href="/">{{ site.title }}</a>
+    {%- if site.header_links or nav_pages %}
+    <nav class="site-nav">
+      {%- for link in site.header_links %}
+      {%- if link.icon %}<a class="page-link" href="{{ link.url }}" title="{{ link.title }}" aria-label="{{ link.title }}"><svg class="svg-icon"><use xlink:href="/assets/minima-social-icons.svg#{{ link.icon }}"></use></svg></a>
+      {%- else %}<a class="page-link" href="{{ link.url }}">{{ link.title }}</a>
+      {%- endif %}
+      {%- endfor -%}
+      {%- for p in nav_pages %}<a class="page-link" href="{{ p.url }}">{{ p.title }}</a>{% endfor -%}
+    </nav>
+    {%- endif %}</div>
+</header>

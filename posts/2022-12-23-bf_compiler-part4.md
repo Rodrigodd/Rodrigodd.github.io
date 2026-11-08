@@ -11,9 +11,9 @@ programming language][rust].
 [eli]: https://eli.thegreenplace.net/2017/adventures-in-jit-compilation-part-1-an-interpreter
 [Rust]: https://www.rust-lang.org
 
-- [Part 1: An Optimized Interpreter]({% post_url 2022-10-16-bf_compiler-part1 %})
-- [Part 2: A Singlepass JIT Compiler]({% post_url 2022-10-16-bf_compiler-part2 %})
-- [Part 3: A Cranelift JIT Compiler]({% post_url 2022-11-21-bf_compiler-part3 %})
+- [Part 1: An Optimized Interpreter](2022-10-16-bf_compiler-part1.md)
+- [Part 2: A Singlepass JIT Compiler](2022-10-16-bf_compiler-part2.md)
+- [Part 3: A Cranelift JIT Compiler](2022-11-21-bf_compiler-part3.md)
 - **Part 4: A Static Compiler**
 
 In this final part we will use the compiled code that we generated in the
@@ -619,7 +619,7 @@ start using `dynasm`][previousJIT], while we were still using syscalls. This is
 because now our compiled code will not have access to Rust functions (unless
 we compile them to a library and link them, as we will see later).
 
-[previousJIT]: {% post_url 2022-10-16-bf_compiler-part2 %}#improving-our-workflow-with-dynasm
+[previousJIT]: 2022-10-16-bf_compiler-part2.md#improving-our-workflow-with-dynasm
 
 We also will need to make some changes. In our JIT compiler we were passing the
 program's memory as an argument to the compiled code, but we will not be able to
