@@ -53,6 +53,11 @@ pre {
     }
 }
 
+// remove the thick bar that minima puts at the top of the page
+.site-header {
+    border-top: 0;
+}
+
 // center images in posts
 .post-content img {
     display: block;
