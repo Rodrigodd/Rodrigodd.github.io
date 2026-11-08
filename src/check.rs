@@ -52,12 +52,13 @@ fn ids(html: &str) -> BTreeSet<String> {
 }
 
 /// Check that the ids of the old page, which may be the target of links, still
-/// exist. Footnote ids are an exception, as they are not linked from outside.
+/// exist. Footnote ids and the id of the old mobile menu are an exception, as
+/// they are not linked from outside.
 fn check_ids(page: &str, old: &str, new: &str) -> bool {
     let new_ids = ids(new);
     let missing: Vec<_> = ids(old)
         .into_iter()
-        .filter(|id| !id.starts_with("fn:") && !id.starts_with("fnref:"))
+        .filter(|id| !id.starts_with("fn:") && !id.starts_with("fnref:") && id != "nav-trigger")
         .filter(|id| !new_ids.contains(id))
         .collect();
     if missing.is_empty() {

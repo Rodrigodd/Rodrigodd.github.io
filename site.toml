@@ -6,6 +6,14 @@ date_format = "%b %-d, %Y"
 # Number of posts in feed.xml (jekyll-feed's default).
 feed_limit = 10
 
+# Links in the page header, before the pages (like "About").
+[[header_links]]
+title = "GitHub"
+url = "https://github.com/Rodrigodd/Rodrigodd.github.io"
+# An icon from static/assets/minima-social-icons.svg, shown instead of the title.
+icon = "github"
+
+# Icons in the page footer, next to the RSS feed icon.
 [[social_links]]
 platform = "github"
 user_url = "https://github.com/Rodrigodd/Rodrigodd.github.io"

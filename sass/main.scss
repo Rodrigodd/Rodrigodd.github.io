@@ -58,6 +58,26 @@ pre {
     border-top: 0;
 }
 
+// The header links are always shown in a row: minima collapses them into a
+// menu on small screens, which is pointless for a couple of links.
+.site-title {
+    padding-right: 0;
+}
+
+.site-nav {
+    position: static;
+    float: right;
+    border: none;
+    background-color: inherit;
+
+    .page-link,
+    .page-link:not(:last-child) {
+        display: inline;
+        padding: 0;
+        margin: 0 0 0 20px;
+    }
+}
+
 // center images in posts
 .post-content img {
     display: block;

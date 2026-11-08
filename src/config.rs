@@ -17,8 +17,19 @@ pub struct Config {
     /// Maximum number of posts in the feed.
     #[serde(default = "default_feed_limit")]
     pub feed_limit: usize,
+    /// Links shown in the page header, before the pages.
+    #[serde(default)]
+    pub header_links: Vec<HeaderLink>,
     #[serde(default)]
     pub social_links: Vec<SocialLink>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HeaderLink {
+    pub title: String,
+    pub url: String,
+    /// An icon from minima-social-icons.svg, shown instead of the title.
+    pub icon: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

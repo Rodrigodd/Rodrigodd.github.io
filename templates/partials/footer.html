@@ -2,23 +2,18 @@
   <data class="u-url" href="/"></data>
 
   <div class="wrapper">
-
-    <div class="footer-col-wrapper">
-      <div class="footer-col">
-        <p class="feed-subscribe">
-          <a href="/feed.xml">
-            <svg class="svg-icon orange">
-              <use xlink:href="/assets/minima-social-icons.svg#rss"></use>
-            </svg><span>Subscribe</span>
-          </a>
-        </p>
-      </div>
-      <div class="footer-col">
-        <p>{{ site.description }}</p>
-      </div>
-    </div>
+    {%- if site.description %}
+    <p class="footer-description">{{ site.description }}</p>
+    {%- endif %}
 
     <div class="social-links"><ul class="social-media-list">
+      <li>
+  <a href="/feed.xml" title="RSS feed">
+    <svg class="svg-icon orange">
+      <use xlink:href="/assets/minima-social-icons.svg#rss"></use>
+    </svg>
+  </a>
+</li>
       {%- for entry in site.social_links %}<li>
   <a rel="me" href="{{ entry.user_url }}" target="_blank" title="{{ entry.platform }}">
     <svg class="svg-icon grey">
