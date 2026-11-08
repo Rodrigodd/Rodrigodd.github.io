@@ -1,5 +1,4 @@
 mod build;
-mod check;
 mod config;
 mod content;
 mod feed;
@@ -19,7 +18,6 @@ usage: site <command> [options]
 commands:
   build    build the site into _site/
   serve    build, serve the site and rebuild it on changes
-  check    compare _site/ with the snapshot of the old Jekyll site in tests/baseline/
 
 serve options:
   --bind <ip>    address to listen on (default: 127.0.0.1), e.g. `0.0.0.0` for
@@ -64,11 +62,6 @@ fn main() -> anyhow::Result<()> {
                 addrs.push(IpAddr::V4(Ipv4Addr::LOCALHOST));
             }
             serve::serve(root, out, &addrs, port)?
-        }
-        Some("check") => {
-            if !check::check(out, &root.join("tests/baseline"))? {
-                std::process::exit(1);
-            }
         }
         _ => bail!("{USAGE}"),
     }

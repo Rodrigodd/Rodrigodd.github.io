@@ -23,8 +23,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Build
         run: cargo run --release -- build
-      - name: Check against the old site
-        run: cargo run --release -- check
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

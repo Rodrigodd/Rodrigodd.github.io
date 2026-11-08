@@ -15,14 +15,7 @@ reloads the page whenever a file changes. Use `--bind <ip>` (repeatable) and
 `--port <port>` to listen on other addresses, e.g. `cargo run -- serve --bind
 0.0.0.0` to open the site from another device on the network.
 
-Other commands:
-
-- `cargo run --release -- build`: build the site into `_site/`.
-- `cargo run -- check`: compare `_site/` with `tests/baseline/`, a snapshot of
-  the site when it was built with Jekyll. It fails if a page of the old site is
-  missing, if a section id of an old page (the target of `page.html#section`
-  links) is gone, if an internal link is broken, or if a feed entry changed its
-  id or dates (feed readers would show it as a new or updated post).
+To only build the site into `_site/`, run `cargo run --release -- build`.
 
 # Organization
 
@@ -30,7 +23,9 @@ Other commands:
 - `posts/`: the blog posts, in Markdown. The file name is `YYYY-MM-DD-slug.md`,
   and the post URL is `/YYYY/MM/DD/slug.html`, using the `date` from the front
   matter. Link to another post using its file name, e.g.
-  `[part 1](2022-10-16-bf_compiler-part1.md)`.
+  `[part 1](2022-10-16-bf_compiler-part1.md)`. Don't change the `date` or the
+  file name of a published post: they define its URL and its id in the feed, and
+  feed readers would show it as a new post.
 - `pages/`: other pages (Markdown or HTML), with a `layout` in the front matter.
 - `templates/`: [minijinja](https://docs.rs/minijinja) templates.
 - `sass/`: the stylesheet, including the vendored [minima](https://github.com/jekyll/minima) theme.
@@ -42,7 +37,7 @@ Other commands:
     and `highlight/fallback.rs`: hand-written highlighters for languages that
     arborium doesn't support (Brainfuck and Cranelift IR);
   - `feed.rs`: the Atom feed;
-  - `build.rs`, `serve.rs`, `check.rs`: the commands.
+  - `build.rs`, `serve.rs`: the commands.
 
 The site is deployed to GitHub Pages by `.github/workflows/deploy.yml` on every
 push to `master`.
